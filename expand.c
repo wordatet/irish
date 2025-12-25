@@ -40,8 +40,10 @@ static int _closedir();
 
 extern int	gmatch();
 
+int
 expand(as, rcnt)
 	unsigned char	*as;
+	int rcnt;
 {
 	int	count; 
 	DIR	*dirf;
@@ -160,7 +162,7 @@ expand(as, rcnt)
 			if (e->d_name[0] == '.' && *cs != '.')
 				continue;
 
-			if (gmatch(e->d_name, cs))
+			if (gmatch(e->d_name, (char *)cs))
 			{
 				addg(s, e->d_name, rescan, slashsav);
 				count++;
@@ -248,7 +250,7 @@ unsigned char	*as1, *as2, *as3, *as4;
 	s2 = locstak() + BYTESPERWORD;
 	s1 = as1;
 	if(as4) {
-		while (*s2 = *s1++)
+		while ((*s2 = *s1++))
 			s2++; 
 	/* Restore first slash before the first metacharacter if as1 is not "/" */
 		if(as4 + 1 == s1)
@@ -256,7 +258,7 @@ unsigned char	*as1, *as2, *as3, *as4;
 	}
 /* add matched entries, plus extra \\ to escape \\'s */
 	s1 = as2;
-	while (*s2 = *s1++) {
+	while ((*s2 = *s1++)) {
 		if(*s2 == '\\')
 			*++s2 = '\\';
 		s2++;
@@ -265,7 +267,7 @@ unsigned char	*as1, *as2, *as3, *as4;
 	if (s1)
 	{
 		*s2++ = '/';
-		while (*s2++ = *++s1);
+		while ((*s2++ = *++s1));
 	}
 	makearg(endstak(s2));
 }

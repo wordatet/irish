@@ -261,6 +261,7 @@ freeargs(blk)
 static struct dolnod *
 copyargs(from, n)
 	unsigned char	*from[];
+	int n;
 {
 	register struct dolnod *np = (struct dolnod *)alloc(sizeof(struct dolnod));
 	register unsigned char **fp = from;
@@ -319,7 +320,7 @@ clearup()
 	globdolv = 0;
 	globdolc = 0;
 	globdolh = 0;
-	while (argfor = clean_args(argfor))
+	while ((argfor = clean_args(argfor)))
 		;
 	/*
 	 * clean up io files

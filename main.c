@@ -78,6 +78,7 @@ extern pid_t getpid();
 extern pid_t getsid();
 extern pid_t getpgid();
 
+int
 main(c, v, e)
 int	c;
 char	*v[];
@@ -151,7 +152,7 @@ char	*e[];
 	 *  the simple file part of the value.
 	 *  is rsh
 	 */
-	if (n = findnam("SHELL"))
+	if ((n = findnam("SHELL")))
 	{
 		if (eq("rsh", simple(n->namval)))
 			rsflag = 0;
@@ -580,6 +581,7 @@ setwidth()
 
 void
 setmode(prof)
+int prof;
 {
 	/*
 	 * decide whether interactive

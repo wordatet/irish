@@ -20,7 +20,9 @@
 
 extern int exitval;
 
+int
 echo(argc, argv)
+int argc;
 unsigned char **argv;
 {
 	register unsigned char	*cp;
@@ -59,7 +61,7 @@ unsigned char **argv;
 
 		if (!strncmp((const char *)argv[1], "-n", 3)) {
 			nonl++;
-			*++argv;
+			++argv;
 			argc--;
 		}
 	

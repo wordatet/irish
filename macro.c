@@ -44,14 +44,14 @@ register unsigned char	endch;
 					pushstak('\\'); 
 					pc = readw(d); 
 					/* push entire multibyte char */
-					while(d = *pc++)
+					while((d = *pc++))
 						pushstak(d);
 				} else
 					pushstak(d);
 			} else { /* push escapes onto stack to quote characters */
 				pc = readw(c); 
 				pushstak('\\');
-				while(c = *pc++)
+				while((c = *pc++))
 					pushstak(c);
 			}
 		} else if(c == '\\') {
@@ -124,7 +124,7 @@ retry:
 			unsigned char		idb[2];
 			unsigned char		*id = idb;
 
-			if (bra = (c == BRACE))
+			if ((bra = (c == BRACE)))
 				c = readc();
 			if (letter(c))
 			{
@@ -248,7 +248,7 @@ retry:
 							pushstak('\0');
 						}
 						else
-							while (c = *v++) {
+							while ((c = *v++)) {
 								if(quote || (c == '\\' && trimflag)) {
 									register int length;
 									wchar_t l;
@@ -306,7 +306,7 @@ retry:
 					 * do assignment 
 					 */
 						usestak();
-						while(c = *argp++) {
+						while((c = *argp++)) {
 							if(c == '\\' && trimflag) {
 								c = *argp++;
 								if(!c)
@@ -433,14 +433,14 @@ int trimflag; /* used to determine if argument will later be trimmed */
 	tdystak(savptr);
 	memcpy(stakbot, savptr, strlngth);
 	oldstaktop = staktop = stakbot + strlngth;
-	while (d = readc()) {
+	while ((d = readc())) {
 		if(quote || (d == '\\' && trimflag)) {
 			register unsigned char *rest;
 			/* quote output from command subst. if within double 
 			   quotes or backslash part of output */
 			rest = readw(d);
 			pushstak('\\');
-			while(d = *rest++)
+			while((d = *rest++))
 			/* Pick up all of multibyte character */
 				pushstak(d);
 		}
@@ -450,7 +450,7 @@ int trimflag; /* used to determine if argument will later be trimmed */
 	{
 		extern pid_t parent;
 		int stat;
-		register rc;
+		register int rc;
 		while (waitpid(parent,&stat,0) != parent)
 			continue;
 		if (WIFEXITED(stat))
@@ -490,7 +490,7 @@ int	in, ot;
 	/*
 	 * DQUOTE used to stop it from quoting
 	 */
-	while (c = (getch(DQUOTE, 0))) /* read characters from here document 
+	while ((c = (getch(DQUOTE, 0)))) /* read characters from here document 
 				       and interpret them */
 	{
 		if(c == '\\') {
@@ -512,6 +512,7 @@ int	in, ot;
 
 static void
 flush(ot)
+int ot;
 {
 	(void)write(ot, stakbot, staktop - stakbot);
 	if (flags & execpr)

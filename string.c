@@ -22,7 +22,7 @@ unsigned char *
 movstr(a, b)
 register unsigned char	*a, *b;
 {
-	while (*b++ = *a++);
+	while ((*b++ = *a++));
 	return(--b);
 }
 
@@ -33,7 +33,7 @@ unsigned char	*s;
 {
 	register unsigned char d;
 
-	while (d = *s++)
+	while ((d = *s++))
 	{
 		if (d == c)
 			return(TRUE);

@@ -37,6 +37,8 @@ static int posix_path();
 int
 execute(argt, xflags, errorflg, pf1, pf2)
 struct trenod	*argt;
+int xflags;
+int errorflg;
 int	*pf1, *pf2;
 {
 	/*
@@ -127,7 +129,6 @@ int	*pf1, *pf2;
 					if ((cnt = findpath(com[0], 0)) > 0)
 					{
 						register unsigned char *path;
-						int len;
 
 						path = getpath(com[0]);
 						while (--cnt && path)
@@ -373,7 +374,7 @@ int	*pf1, *pf2;
 		case TAND:
 		case TORF:
 		{
-			register xval;
+			register int xval;
 			xval = execute(lstptr(t)->lstlef, XEC_NOSTOP, 0);
 			if ((xval == 0) == (type == TAND))
 				execute(lstptr(t)->lstrit, xflags|XEC_NOSTOP, errorflg);
@@ -464,7 +465,7 @@ int	*pf1, *pf2;
 					{
 						register unsigned char	*s;
 
-						if (gmatch(r, s = macro(rex->argval)) || (trim(s), eq(r, s)))
+						if (gmatch((const char *)r, (const char *)(s = macro(rex->argval))) || (trim(s), eq(r, s)))
 						{
 							execute(regp->regcom, XEC_NOSTOP, errorflg);
 							regp = 0;

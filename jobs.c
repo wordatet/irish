@@ -233,7 +233,7 @@ int rc;
 		jp->j_pgid = getpgid(jp->j_pid);
 		jp->j_tgid = jp->j_pgid;
 		if (fg) {
-			if (tgid = settgid(mypgid, jp->j_pgid))
+			if ((tgid = settgid(mypgid, jp->j_pgid)))
 				jp->j_tgid = tgid;
 			else {
 				jp->j_flag |= J_SAVETTY;
@@ -298,10 +298,11 @@ int rc;
 
 static void
 collectjobs(wnohang)
+int wnohang;
 {
 	pid_t pid;
 	register struct job *jp;
-	int stat, n;
+	int stat;
 
 #ifdef _sgi
 	/*
@@ -321,7 +322,7 @@ collectjobs(wnohang)
 #endif
 		if ((pid = waitpid(-1,&stat,wnohang|WUNTRACED|WCONTINUED)) <= 0)
 			break;
-		if (jp = pgid2job(pid))
+		if ((jp = pgid2job(pid)))
 			(void)statjob(jp,stat,0,0);
 	}
 
@@ -421,6 +422,7 @@ pid_t new, expected;
 static void
 restartjob(jp,fg)
 register struct job *jp;
+int fg;
 {
 	if (jp != jobcur) {
 		register struct job *t;
@@ -464,6 +466,7 @@ register struct job *jp;
 static void
 printjob(jp,propts)
 register struct job *jp;
+int propts;
 {
 	int sp = 0;
 
@@ -905,7 +908,7 @@ char *argv[];
 	register int	cmd;
 	register int fg;
 
-	if (fg = eq("fg",argv[0]))
+	if ((fg = eq("fg",argv[0])))
 		cmd = SYSFG;
 	else
 		cmd = SYSBG;
@@ -940,7 +943,7 @@ syswait(argc,argv)
 int argc;
 char *argv[];
 {
-	register int cmd = (int)*argv;
+	register int cmd = SYSWAIT;
 	register struct job *jp;
 	int stat;
 
@@ -1088,8 +1091,8 @@ char *argv[];
 
 		if (argc == 2) {
 
-			register i;
-			register cnt = 0;
+			register int i;
+			register int cnt = 0;
 			register char sep = 0;
 			char buf[12];
 

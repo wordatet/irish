@@ -365,7 +365,7 @@ extern int execute();
 
 /*Macros*/
 #define 	attrib(n,f)		(n->namflg |= f)
-#define 	round(a,b)		(((long)(((char *)(a)+b)-1))&~((b)-1))
+#define 	round(a,b)		((((long)(a)+(b))-1)&~((b)-1))
 #define 	closepipe(x)	(close(x[INPIPE]), close(x[OTPIPE]))
 #define 	eq(a,b)			(cf(a,b)==0)
 #define 	max(a,b)		((a)>(b)?(a):(b))
@@ -669,6 +669,7 @@ void error(int, const char *, const char *);
 void error_fail(int, const char *, const char *);
 void failure(int, const unsigned char *, const char *, const char *);
 void prusage(int, const char *, const char *);
+void warning(int, const char *, const char *);
 #else
 void failed();
 void error();

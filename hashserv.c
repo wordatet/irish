@@ -92,7 +92,7 @@ pathlook(com, flg, arg)
 		h->cost = 0;
 	}
 
-	if (i = syslook(name, commands, no_commands))
+	if ((i = syslook(name, commands, no_commands)))
 	{
 		hentry.data = (BUILTIN | i);
 		count = 1;
@@ -261,7 +261,7 @@ func_unhash(name)
 	h = hfind(name);
 
 	if (h && (h->data & FUNCTION)) {
-		if(i = syslook(name, commands, no_commands))
+		if((i = syslook(name, commands, no_commands)))
 			h->data = (BUILTIN|i);
 		else
 			h->data = NOTFOUND;

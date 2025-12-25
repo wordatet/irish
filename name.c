@@ -39,7 +39,7 @@ static void	exname();
 static void	pushnam();
 static void	setname();
 static BOOL	chkid();
-static int	patheq();
+/* static int	patheq(); */
 
 struct namnod ps2nod =
 {
@@ -311,7 +311,7 @@ unsigned char	*v;
 static void
 set_builtins_path()
 {
-        register unsigned char *path;
+        /* register unsigned char *path; */
 
         ucb_builtins = 0;
 #ifdef sgi
@@ -332,6 +332,7 @@ set_builtins_path()
 #endif
 }
  
+/*
 static int
 patheq(component, dir)
 register unsigned char   *component;
@@ -343,13 +344,14 @@ register char   *dir;
         {
                 c = *component++;
                 if (c == COLON)
-                        c = '\0';       /* end of component of path */
+                        c = '\0';       // end of component of path
                 if (c != *dir++)
                         return(0);
                 if (c == '\0')
                         return(1);
         }
 }
+*/
 
 int 
 readvar(names)
@@ -380,7 +382,7 @@ unsigned char	**names;
 			break;
 		rest = readw(d);
 		pc = c;
-		while(*pc++ = *rest++);
+		while((*pc++ = *rest++));
 		if(!anys(c, ifsnod.namval))
 			break;
 	}
@@ -413,7 +415,7 @@ unsigned char	**names;
 						break;
 					rest = readw(d);
 					pc = c;
-					while(*pc++ = *rest++);
+					while((*pc++ = *rest++));
 					if(!anys(c, ifsnod.namval))
 						break;
 				}
@@ -423,14 +425,14 @@ unsigned char	**names;
 			if(d == '\\') {
 				d = readc();
 				rest = readw(d);
-				while(d = *rest++)
+				while((d = *rest++))
 					pushstak(d);
 				oldstak = staktop;
 			}
 			else
 			{
 				pc = c;
-				while(d = *pc++) 
+				while((d = *pc++)) 
 					pushstak(d);
 				if(!anys(c, ifsnod.namval))
 					oldstak = staktop;
@@ -443,7 +445,7 @@ unsigned char	**names;
 			{
 				rest = readw(d);
 				pc = c;
-				while(*pc++ = *rest++);
+				while((*pc++ = *rest++));
 			}
 		}
 	}
@@ -584,7 +586,7 @@ struct namnod *n;
 		prf(n->namenv);
 		prc_buff(NL);
 	}
-	else if (s = n->namval)
+	else if ((s = n->namval))
 	{
 		prs_buff(n->namid);
 		prc_buff('=');
@@ -725,7 +727,7 @@ unset_name(name)
 {
 	register struct namnod	*n;
 
-	if (n = findnam(name))
+	if ((n = findnam(name)))
 	{
 		if (n->namflg & N_RDONLY)
 			failed(0, name, wtfailed, wtfailedid);

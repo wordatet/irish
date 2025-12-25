@@ -185,6 +185,7 @@ int	i;
 
 void
 done(sig)
+int sig;
 {
 	register unsigned char	*t = trapcom[0];
 
@@ -218,6 +219,7 @@ done(sig)
 static void 
 fault(sig, code, scp)
 register int	sig;
+int code;
 void *scp;
 {
 	register int flag;

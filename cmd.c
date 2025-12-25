@@ -124,7 +124,7 @@ cmd(sym, flg)
 			synbad();
 
 	case ';':	/*FALLTHROUGH*/
-		if (e = cmd(sym, flg | MTFLG))
+		if ((e = cmd(sym, flg | MTFLG)))
 			i = makelist(TLST, i, e);
 		else if (i == 0)
 			synbad();
@@ -149,6 +149,7 @@ cmd(sym, flg)
  */
 static struct trenod *
 list(flg)
+	int flg;
 {
 	register struct trenod *r;
 	register int		b;
@@ -166,6 +167,7 @@ list(flg)
  */
 static struct trenod *
 term(flg)
+	int flg;
 {
 	register struct trenod *t;
 
@@ -464,7 +466,7 @@ item(flag)
 	}
 	reserv++;
 	word();
-	if (io = inout(io))
+	if ((io = inout(io)))
 	{
 		r = makefork(0,r);
 		r->treio = io;
@@ -549,6 +551,7 @@ chkword()
 
 static void
 chksym(sym)
+	int sym;
 {
 	register int	x = sym & wdval;
 
@@ -558,6 +561,7 @@ chksym(sym)
 
 static void
 prsym(sym)
+	int sym;
 {
 	if (sym & SYMFLG)
 	{

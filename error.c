@@ -88,7 +88,7 @@ struct ionod	*base;
 {
 	while (iotemp > base)
 	{
-		(void)unlink(iotemp->ioname);
+		(void)unlink((char *)iotemp->ioname);
 		free(iotemp->iolink);
 		iotemp = iotemp->iolst;
 	}
@@ -99,7 +99,7 @@ rmfunctmp()
 {
 	while (fiotemp)
 	{
-		(void)unlink(fiotemp->ioname);
+		(void)unlink((char *)fiotemp->ioname);
 		fiotemp = fiotemp->iolst;
 	}
 }
@@ -160,9 +160,8 @@ long flag;
 const char unsigned *s1;
 const char	 *s2, *s2id;
 {
-	int comb_label;
 	flushb();
-	comb_label = set_label(cmd);
+	(void)set_label(cmd);
 	/* pfmt(stderr, flag, NULL); */
 	/* flag 0 = error, 1 = warning */
 	/* pfmt would print UX:sh: ERROR: ... */

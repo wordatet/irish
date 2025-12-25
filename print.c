@@ -110,6 +110,7 @@ prn(n)
 
 void
 itos(n)
+int n;
 {
 	unsigned char *abuf;
 	unsigned a;

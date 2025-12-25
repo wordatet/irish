@@ -52,13 +52,6 @@ struct trenod	*t;
 {
 	short index = initio(t->treio, (type != SYSEXEC));
 	unsigned char *a1 = argv[1];
-	int c, newmode = -1;
-	static const struct {
-		const char *id, *msg;
-	} charmode[] = {
-		{":823", "virtual"},
-		{":824", "real"}
-	};
 
 	switch (type)		
 	{
@@ -203,7 +196,7 @@ struct trenod	*t;
 			     *a1 == '/' ||
 			     cf(a1, ".") == 0 ||
 			     cf(a1, "..") == 0 ||
-			     (*a1 == '.' && (*(a1+1) == '/' || *(a1+1) == '.' && *(a1+2) == '/')))
+			     (*a1 == '.' && (*(a1+1) == '/' || (*(a1+1) == '.' && *(a1+2) == '/'))))
 				cdpath = (unsigned char *)nullstr;
 
 			do
@@ -211,7 +204,7 @@ struct trenod	*t;
 				dir = cdpath;
 				cdpath = catpath(cdpath,a1);
 			}
-			while ((f = chdir(curstak()) < 0) && cdpath);
+			while ((f = chdir((char *)curstak()) < 0) && cdpath);
 
 			if (f) {
 				switch(errno) {

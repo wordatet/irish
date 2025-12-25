@@ -63,7 +63,7 @@ word()
 				/* Pick up rest of multibyte character */
 					if (c == NL)
 						chkpr();
-					while(c = *pc++)
+					while((c = *pc++))
 						*argp++ = c;
 				}
 				if(argp == oldargp) { /* null argument - '' */

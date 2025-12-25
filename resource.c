@@ -88,6 +88,7 @@ dolimit(v)
 	limit = getval(lp, v+1);
 	if (setlim(lp, hard, limit) < 0)
 		exitsh(ERROR);
+	return(0);
 }
 
 static int64_t
@@ -158,7 +159,7 @@ badscal:
 	return ((int64_t)(f+0.5));
 }
 
-static
+static int
 limtail(cp, str0)
 	unsigned char *cp, *str0;
 {
@@ -171,7 +172,7 @@ limtail(cp, str0)
 	return(0);
 }
 
-static
+static int
 plim(register struct limits *lp, char hard)
 {
 	struct rlimit rlim;
@@ -221,9 +222,10 @@ dounlimit(v)
 		if (setlim(lp, hard, (rlim_t)RLIM_INFINITY) < 0)
 			exitsh(ERROR);
 	}
+	return(0);
 }
 
-static
+static int
 setlim(register struct limits *lp, char hard, rlim_t limit)
 {
 	struct rlimit rlim;
@@ -253,7 +255,7 @@ setlim(register struct limits *lp, char hard, rlim_t limit)
 	return (0);
 }
 
-static
+static int
 psecs(int64_t l)
 {
 	register int64_t i;
@@ -272,9 +274,10 @@ minsec:
 	i %= 60;
 	prc_buff(':');
 	p2dig(i);
+	return(0);
 }
 
-static
+static int
 p2dig(register int64_t i)
 {
 
@@ -283,7 +286,7 @@ p2dig(register int64_t i)
 	return(0);
 }
 
-static
+static int
 prefix(sub, str)
 	register unsigned char *sub, *str;
 {

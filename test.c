@@ -56,6 +56,7 @@ int	argn;
 
 static unsigned char *
 nxtarg(mt)
+int mt;
 {
 	if (ap >= ac)
 	{

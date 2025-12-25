@@ -80,7 +80,7 @@ initio(iop, save)
 						*/
 
 				fd = chkopen(tmpout);
-				(void)unlink(tmpout);
+				(void)unlink((char *)tmpout);
 			}
 			else if (iof & IOMOV)
 			{
@@ -157,6 +157,7 @@ getpath(s)
 		} else
 			return(cpystak(path));
 	}
+	return((unsigned char *)0);
 	/*NOTREACHED*/
 }
 
@@ -245,7 +246,7 @@ execa(at, pos)
 			(void)execs(path, t);
 			path = getpath(*t);
 		}
-		while (path = execs(path,t))
+		while ((path = execs(path,t)))
 			;
 #ifdef sgi
 		if (suidscript)
@@ -267,7 +268,7 @@ register unsigned char	*t[];
 	trim(p = curstak());
 	sigchk();
 	
-	(void)execve(p, &t[0] ,xecenv);
+	(void)execve((char *)p, (char **)t ,(char **)xecenv);
 	switch (errno)
 	{
 	case ENOEXEC:		/* could be a shell script */
@@ -354,11 +355,11 @@ unsigned char	*at;
 	if (current)
 	{
 		last = at;
-		while (c = *current++)
+		while ((c = *current++))
 		{
 			if(c == '\\')  { /* remove \ and quoted nulls */
 				nosubst = 1;
-				if(c = *current++)
+				if((c = *current++))
 					*last++ = c;
 			} else
 				*last++ = c;
@@ -381,7 +382,7 @@ unsigned char	*at;
 	if (current)
 	{
 		last = at;
-		while (c = *current++)
+		while ((c = *current++))
 		{
 			if(c == '\\')  { /* remove \ and quoted nulls */
 				if((c = *current++)=='/')
@@ -507,7 +508,7 @@ unsigned char	*s;
 		register int length;
 		sigchk();
 		argp = locstak() + BYTESPERWORD;
-		while (c = *s) { 
+		while ((c = *s)) { 
 			wchar_t l;
 			length = mbtowc(&l, (char *)s, MULTI_BYTE_MAX);
 			if(c == '\\') { /* skip over quoted characters */
