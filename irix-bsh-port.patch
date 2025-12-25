@@ -1,0 +1,890 @@
+diff --git a/args.c b/args.c
+index 46ea973..073d3ae 100644
+--- a/args.c
++++ b/args.c
+@@ -261,6 +261,7 @@ freeargs(blk)
+ static struct dolnod *
+ copyargs(from, n)
+ 	unsigned char	*from[];
++	int n;
+ {
+ 	register struct dolnod *np = (struct dolnod *)alloc(sizeof(struct dolnod));
+ 	register unsigned char **fp = from;
+@@ -319,7 +320,7 @@ clearup()
+ 	globdolv = 0;
+ 	globdolc = 0;
+ 	globdolh = 0;
+-	while (argfor = clean_args(argfor))
++	while ((argfor = clean_args(argfor)))
+ 		;
+ 	/*
+ 	 * clean up io files
+diff --git a/bltin.c b/bltin.c
+index 1a58541..efe4082 100644
+--- a/bltin.c
++++ b/bltin.c
+@@ -52,13 +52,6 @@ struct trenod	*t;
+ {
+ 	short index = initio(t->treio, (type != SYSEXEC));
+ 	unsigned char *a1 = argv[1];
+-	int c, newmode = -1;
+-	static const struct {
+-		const char *id, *msg;
+-	} charmode[] = {
+-		{":823", "virtual"},
+-		{":824", "real"}
+-	};
+ 
+ 	switch (type)		
+ 	{
+@@ -203,7 +196,7 @@ struct trenod	*t;
+ 			     *a1 == '/' ||
+ 			     cf(a1, ".") == 0 ||
+ 			     cf(a1, "..") == 0 ||
+-			     (*a1 == '.' && (*(a1+1) == '/' || *(a1+1) == '.' && *(a1+2) == '/')))
++			     (*a1 == '.' && (*(a1+1) == '/' || (*(a1+1) == '.' && *(a1+2) == '/'))))
+ 				cdpath = (unsigned char *)nullstr;
+ 
+ 			do
+@@ -211,7 +204,7 @@ struct trenod	*t;
+ 				dir = cdpath;
+ 				cdpath = catpath(cdpath,a1);
+ 			}
+-			while ((f = chdir(curstak()) < 0) && cdpath);
++			while ((f = chdir((char *)curstak()) < 0) && cdpath);
+ 
+ 			if (f) {
+ 				switch(errno) {
+diff --git a/cmd.c b/cmd.c
+index cb9416d..f74c0a9 100644
+--- a/cmd.c
++++ b/cmd.c
+@@ -124,7 +124,7 @@ cmd(sym, flg)
+ 			synbad();
+ 
+ 	case ';':	/*FALLTHROUGH*/
+-		if (e = cmd(sym, flg | MTFLG))
++		if ((e = cmd(sym, flg | MTFLG)))
+ 			i = makelist(TLST, i, e);
+ 		else if (i == 0)
+ 			synbad();
+@@ -149,6 +149,7 @@ cmd(sym, flg)
+  */
+ static struct trenod *
+ list(flg)
++	int flg;
+ {
+ 	register struct trenod *r;
+ 	register int		b;
+@@ -166,6 +167,7 @@ list(flg)
+  */
+ static struct trenod *
+ term(flg)
++	int flg;
+ {
+ 	register struct trenod *t;
+ 
+@@ -464,7 +466,7 @@ item(flag)
+ 	}
+ 	reserv++;
+ 	word();
+-	if (io = inout(io))
++	if ((io = inout(io)))
+ 	{
+ 		r = makefork(0,r);
+ 		r->treio = io;
+@@ -549,6 +551,7 @@ chkword()
+ 
+ static void
+ chksym(sym)
++	int sym;
+ {
+ 	register int	x = sym & wdval;
+ 
+@@ -558,6 +561,7 @@ chksym(sym)
+ 
+ static void
+ prsym(sym)
++	int sym;
+ {
+ 	if (sym & SYMFLG)
+ 	{
+diff --git a/defs.h b/defs.h
+index f2d667f..9e77e28 100644
+--- a/defs.h
++++ b/defs.h
+@@ -365,7 +365,7 @@ extern int execute();
+ 
+ /*Macros*/
+ #define 	attrib(n,f)		(n->namflg |= f)
+-#define 	round(a,b)		(((long)(((char *)(a)+b)-1))&~((b)-1))
++#define 	round(a,b)		((((long)(a)+(b))-1)&~((b)-1))
+ #define 	closepipe(x)	(close(x[INPIPE]), close(x[OTPIPE]))
+ #define 	eq(a,b)			(cf(a,b)==0)
+ #define 	max(a,b)		((a)>(b)?(a):(b))
+@@ -669,6 +669,7 @@ void error(int, const char *, const char *);
+ void error_fail(int, const char *, const char *);
+ void failure(int, const unsigned char *, const char *, const char *);
+ void prusage(int, const char *, const char *);
++void warning(int, const char *, const char *);
+ #else
+ void failed();
+ void error();
+diff --git a/echo.c b/echo.c
+index f9cc358..ae5b273 100644
+--- a/echo.c
++++ b/echo.c
+@@ -20,7 +20,9 @@
+ 
+ extern int exitval;
+ 
++int
+ echo(argc, argv)
++int argc;
+ unsigned char **argv;
+ {
+ 	register unsigned char	*cp;
+@@ -59,7 +61,7 @@ unsigned char **argv;
+ 
+ 		if (!strncmp((const char *)argv[1], "-n", 3)) {
+ 			nonl++;
+-			*++argv;
++			++argv;
+ 			argc--;
+ 		}
+ 	
+diff --git a/error.c b/error.c
+index 8b1a1cd..b344955 100644
+--- a/error.c
++++ b/error.c
+@@ -88,7 +88,7 @@ struct ionod	*base;
+ {
+ 	while (iotemp > base)
+ 	{
+-		(void)unlink(iotemp->ioname);
++		(void)unlink((char *)iotemp->ioname);
+ 		free(iotemp->iolink);
+ 		iotemp = iotemp->iolst;
+ 	}
+@@ -99,7 +99,7 @@ rmfunctmp()
+ {
+ 	while (fiotemp)
+ 	{
+-		(void)unlink(fiotemp->ioname);
++		(void)unlink((char *)fiotemp->ioname);
+ 		fiotemp = fiotemp->iolst;
+ 	}
+ }
+@@ -160,9 +160,8 @@ long flag;
+ const char unsigned *s1;
+ const char	 *s2, *s2id;
+ {
+-	int comb_label;
+ 	flushb();
+-	comb_label = set_label(cmd);
++	(void)set_label(cmd);
+ 	/* pfmt(stderr, flag, NULL); */
+ 	/* flag 0 = error, 1 = warning */
+ 	/* pfmt would print UX:sh: ERROR: ... */
+diff --git a/expand.c b/expand.c
+index d066905..14d5216 100644
+--- a/expand.c
++++ b/expand.c
+@@ -40,8 +40,10 @@ static int _closedir();
+ 
+ extern int	gmatch();
+ 
++int
+ expand(as, rcnt)
+ 	unsigned char	*as;
++	int rcnt;
+ {
+ 	int	count; 
+ 	DIR	*dirf;
+@@ -160,7 +162,7 @@ expand(as, rcnt)
+ 			if (e->d_name[0] == '.' && *cs != '.')
+ 				continue;
+ 
+-			if (gmatch(e->d_name, cs))
++			if (gmatch(e->d_name, (char *)cs))
+ 			{
+ 				addg(s, e->d_name, rescan, slashsav);
+ 				count++;
+@@ -248,7 +250,7 @@ unsigned char	*as1, *as2, *as3, *as4;
+ 	s2 = locstak() + BYTESPERWORD;
+ 	s1 = as1;
+ 	if(as4) {
+-		while (*s2 = *s1++)
++		while ((*s2 = *s1++))
+ 			s2++; 
+ 	/* Restore first slash before the first metacharacter if as1 is not "/" */
+ 		if(as4 + 1 == s1)
+@@ -256,7 +258,7 @@ unsigned char	*as1, *as2, *as3, *as4;
+ 	}
+ /* add matched entries, plus extra \\ to escape \\'s */
+ 	s1 = as2;
+-	while (*s2 = *s1++) {
++	while ((*s2 = *s1++)) {
+ 		if(*s2 == '\\')
+ 			*++s2 = '\\';
+ 		s2++;
+@@ -265,7 +267,7 @@ unsigned char	*as1, *as2, *as3, *as4;
+ 	if (s1)
+ 	{
+ 		*s2++ = '/';
+-		while (*s2++ = *++s1);
++		while ((*s2++ = *++s1));
+ 	}
+ 	makearg(endstak(s2));
+ }
+diff --git a/fault.c b/fault.c
+index da0bc69..f1cf238 100644
+--- a/fault.c
++++ b/fault.c
+@@ -185,6 +185,7 @@ int	i;
+ 
+ void
+ done(sig)
++int sig;
+ {
+ 	register unsigned char	*t = trapcom[0];
+ 
+@@ -218,6 +219,7 @@ done(sig)
+ static void 
+ fault(sig, code, scp)
+ register int	sig;
++int code;
+ void *scp;
+ {
+ 	register int flag;
+diff --git a/hashserv.c b/hashserv.c
+index 426ebf5..d9e0f79 100644
+--- a/hashserv.c
++++ b/hashserv.c
+@@ -92,7 +92,7 @@ pathlook(com, flg, arg)
+ 		h->cost = 0;
+ 	}
+ 
+-	if (i = syslook(name, commands, no_commands))
++	if ((i = syslook(name, commands, no_commands)))
+ 	{
+ 		hentry.data = (BUILTIN | i);
+ 		count = 1;
+@@ -261,7 +261,7 @@ func_unhash(name)
+ 	h = hfind(name);
+ 
+ 	if (h && (h->data & FUNCTION)) {
+-		if(i = syslook(name, commands, no_commands))
++		if((i = syslook(name, commands, no_commands)))
+ 			h->data = (BUILTIN|i);
+ 		else
+ 			h->data = NOTFOUND;
+diff --git a/jobs.c b/jobs.c
+index 03903e5..26dc1d5 100644
+--- a/jobs.c
++++ b/jobs.c
+@@ -233,7 +233,7 @@ int rc;
+ 		jp->j_pgid = getpgid(jp->j_pid);
+ 		jp->j_tgid = jp->j_pgid;
+ 		if (fg) {
+-			if (tgid = settgid(mypgid, jp->j_pgid))
++			if ((tgid = settgid(mypgid, jp->j_pgid)))
+ 				jp->j_tgid = tgid;
+ 			else {
+ 				jp->j_flag |= J_SAVETTY;
+@@ -298,10 +298,11 @@ int rc;
+ 
+ static void
+ collectjobs(wnohang)
++int wnohang;
+ {
+ 	pid_t pid;
+ 	register struct job *jp;
+-	int stat, n;
++	int stat;
+ 
+ #ifdef _sgi
+ 	/*
+@@ -321,7 +322,7 @@ collectjobs(wnohang)
+ #endif
+ 		if ((pid = waitpid(-1,&stat,wnohang|WUNTRACED|WCONTINUED)) <= 0)
+ 			break;
+-		if (jp = pgid2job(pid))
++		if ((jp = pgid2job(pid)))
+ 			(void)statjob(jp,stat,0,0);
+ 	}
+ 
+@@ -421,6 +422,7 @@ pid_t new, expected;
+ static void
+ restartjob(jp,fg)
+ register struct job *jp;
++int fg;
+ {
+ 	if (jp != jobcur) {
+ 		register struct job *t;
+@@ -464,6 +466,7 @@ register struct job *jp;
+ static void
+ printjob(jp,propts)
+ register struct job *jp;
++int propts;
+ {
+ 	int sp = 0;
+ 
+@@ -905,7 +908,7 @@ char *argv[];
+ 	register int	cmd;
+ 	register int fg;
+ 
+-	if (fg = eq("fg",argv[0]))
++	if ((fg = eq("fg",argv[0])))
+ 		cmd = SYSFG;
+ 	else
+ 		cmd = SYSBG;
+@@ -940,7 +943,7 @@ syswait(argc,argv)
+ int argc;
+ char *argv[];
+ {
+-	register int cmd = (int)*argv;
++	register int cmd = SYSWAIT;
+ 	register struct job *jp;
+ 	int stat;
+ 
+@@ -1088,8 +1091,8 @@ char *argv[];
+ 
+ 		if (argc == 2) {
+ 
+-			register i;
+-			register cnt = 0;
++			register int i;
++			register int cnt = 0;
+ 			register char sep = 0;
+ 			char buf[12];
+ 
+diff --git a/macro.c b/macro.c
+index b0e9c6d..b76118d 100644
+--- a/macro.c
++++ b/macro.c
+@@ -44,14 +44,14 @@ register unsigned char	endch;
+ 					pushstak('\\'); 
+ 					pc = readw(d); 
+ 					/* push entire multibyte char */
+-					while(d = *pc++)
++					while((d = *pc++))
+ 						pushstak(d);
+ 				} else
+ 					pushstak(d);
+ 			} else { /* push escapes onto stack to quote characters */
+ 				pc = readw(c); 
+ 				pushstak('\\');
+-				while(c = *pc++)
++				while((c = *pc++))
+ 					pushstak(c);
+ 			}
+ 		} else if(c == '\\') {
+@@ -124,7 +124,7 @@ retry:
+ 			unsigned char		idb[2];
+ 			unsigned char		*id = idb;
+ 
+-			if (bra = (c == BRACE))
++			if ((bra = (c == BRACE)))
+ 				c = readc();
+ 			if (letter(c))
+ 			{
+@@ -248,7 +248,7 @@ retry:
+ 							pushstak('\0');
+ 						}
+ 						else
+-							while (c = *v++) {
++							while ((c = *v++)) {
+ 								if(quote || (c == '\\' && trimflag)) {
+ 									register int length;
+ 									wchar_t l;
+@@ -306,7 +306,7 @@ retry:
+ 					 * do assignment 
+ 					 */
+ 						usestak();
+-						while(c = *argp++) {
++						while((c = *argp++)) {
+ 							if(c == '\\' && trimflag) {
+ 								c = *argp++;
+ 								if(!c)
+@@ -433,14 +433,14 @@ int trimflag; /* used to determine if argument will later be trimmed */
+ 	tdystak(savptr);
+ 	memcpy(stakbot, savptr, strlngth);
+ 	oldstaktop = staktop = stakbot + strlngth;
+-	while (d = readc()) {
++	while ((d = readc())) {
+ 		if(quote || (d == '\\' && trimflag)) {
+ 			register unsigned char *rest;
+ 			/* quote output from command subst. if within double 
+ 			   quotes or backslash part of output */
+ 			rest = readw(d);
+ 			pushstak('\\');
+-			while(d = *rest++)
++			while((d = *rest++))
+ 			/* Pick up all of multibyte character */
+ 				pushstak(d);
+ 		}
+@@ -450,7 +450,7 @@ int trimflag; /* used to determine if argument will later be trimmed */
+ 	{
+ 		extern pid_t parent;
+ 		int stat;
+-		register rc;
++		register int rc;
+ 		while (waitpid(parent,&stat,0) != parent)
+ 			continue;
+ 		if (WIFEXITED(stat))
+@@ -490,7 +490,7 @@ int	in, ot;
+ 	/*
+ 	 * DQUOTE used to stop it from quoting
+ 	 */
+-	while (c = (getch(DQUOTE, 0))) /* read characters from here document 
++	while ((c = (getch(DQUOTE, 0)))) /* read characters from here document 
+ 				       and interpret them */
+ 	{
+ 		if(c == '\\') {
+@@ -512,6 +512,7 @@ int	in, ot;
+ 
+ static void
+ flush(ot)
++int ot;
+ {
+ 	(void)write(ot, stakbot, staktop - stakbot);
+ 	if (flags & execpr)
+diff --git a/main.c b/main.c
+index f067584..4c6106d 100644
+--- a/main.c
++++ b/main.c
+@@ -78,6 +78,7 @@ extern pid_t getpid();
+ extern pid_t getsid();
+ extern pid_t getpgid();
+ 
++int
+ main(c, v, e)
+ int	c;
+ char	*v[];
+@@ -151,7 +152,7 @@ char	*e[];
+ 	 *  the simple file part of the value.
+ 	 *  is rsh
+ 	 */
+-	if (n = findnam("SHELL"))
++	if ((n = findnam("SHELL")))
+ 	{
+ 		if (eq("rsh", simple(n->namval)))
+ 			rsflag = 0;
+@@ -580,6 +581,7 @@ setwidth()
+ 
+ void
+ setmode(prof)
++int prof;
+ {
+ 	/*
+ 	 * decide whether interactive
+diff --git a/name.c b/name.c
+index 11b5467..3723683 100644
+--- a/name.c
++++ b/name.c
+@@ -39,7 +39,7 @@ static void	exname();
+ static void	pushnam();
+ static void	setname();
+ static BOOL	chkid();
+-static int	patheq();
++/* static int	patheq(); */
+ 
+ struct namnod ps2nod =
+ {
+@@ -311,7 +311,7 @@ unsigned char	*v;
+ static void
+ set_builtins_path()
+ {
+-        register unsigned char *path;
++        /* register unsigned char *path; */
+ 
+         ucb_builtins = 0;
+ #ifdef sgi
+@@ -332,6 +332,7 @@ set_builtins_path()
+ #endif
+ }
+  
++/*
+ static int
+ patheq(component, dir)
+ register unsigned char   *component;
+@@ -343,13 +344,14 @@ register char   *dir;
+         {
+                 c = *component++;
+                 if (c == COLON)
+-                        c = '\0';       /* end of component of path */
++                        c = '\0';       // end of component of path
+                 if (c != *dir++)
+                         return(0);
+                 if (c == '\0')
+                         return(1);
+         }
+ }
++*/
+ 
+ int 
+ readvar(names)
+@@ -380,7 +382,7 @@ unsigned char	**names;
+ 			break;
+ 		rest = readw(d);
+ 		pc = c;
+-		while(*pc++ = *rest++);
++		while((*pc++ = *rest++));
+ 		if(!anys(c, ifsnod.namval))
+ 			break;
+ 	}
+@@ -413,7 +415,7 @@ unsigned char	**names;
+ 						break;
+ 					rest = readw(d);
+ 					pc = c;
+-					while(*pc++ = *rest++);
++					while((*pc++ = *rest++));
+ 					if(!anys(c, ifsnod.namval))
+ 						break;
+ 				}
+@@ -423,14 +425,14 @@ unsigned char	**names;
+ 			if(d == '\\') {
+ 				d = readc();
+ 				rest = readw(d);
+-				while(d = *rest++)
++				while((d = *rest++))
+ 					pushstak(d);
+ 				oldstak = staktop;
+ 			}
+ 			else
+ 			{
+ 				pc = c;
+-				while(d = *pc++) 
++				while((d = *pc++)) 
+ 					pushstak(d);
+ 				if(!anys(c, ifsnod.namval))
+ 					oldstak = staktop;
+@@ -443,7 +445,7 @@ unsigned char	**names;
+ 			{
+ 				rest = readw(d);
+ 				pc = c;
+-				while(*pc++ = *rest++);
++				while((*pc++ = *rest++));
+ 			}
+ 		}
+ 	}
+@@ -584,7 +586,7 @@ struct namnod *n;
+ 		prf(n->namenv);
+ 		prc_buff(NL);
+ 	}
+-	else if (s = n->namval)
++	else if ((s = n->namval))
+ 	{
+ 		prs_buff(n->namid);
+ 		prc_buff('=');
+@@ -725,7 +727,7 @@ unset_name(name)
+ {
+ 	register struct namnod	*n;
+ 
+-	if (n = findnam(name))
++	if ((n = findnam(name)))
+ 	{
+ 		if (n->namflg & N_RDONLY)
+ 			failed(0, name, wtfailed, wtfailedid);
+diff --git a/print.c b/print.c
+index 5cab353..41168ac 100644
+--- a/print.c
++++ b/print.c
+@@ -110,6 +110,7 @@ prn(n)
+ 
+ void
+ itos(n)
++int n;
+ {
+ 	unsigned char *abuf;
+ 	unsigned a;
+diff --git a/pwd.c b/pwd.c
+index 5e85314..7a55a46 100644
+--- a/pwd.c
++++ b/pwd.c
+@@ -73,9 +73,9 @@ cwd(dir)
+ 	/* take care of trailing /. */
+ 	if(*(--pdir)==DOT && pdir > dir && *(--pdir)==SLASH) {
+ 		if(pdir > dir) {
+-			*pdir = NULL;
++			*pdir = 0;
+ 		} else {
+-			*(pdir+1) = NULL;
++			*(pdir+1) = 0;
+ 		}
+ 	
+ 	}
+@@ -86,7 +86,7 @@ cwd(dir)
+ 
+ 	/* Now that the dir is canonicalized, process it */
+ 
+-	if(*dir==DOT && *(dir+1)==NULL)
++	if(*dir==DOT && *(dir+1)==0)
+ 	{
+ 		return;
+ 	}
+@@ -115,7 +115,7 @@ cwd(dir)
+ 	{
+ 		if(*dir==DOT && 
+ 		   *(dir+1)==DOT &&
+-		   (*(dir+2)==SLASH || *(dir+2)==NULL))
++		   (*(dir+2)==SLASH || *(dir+2)==0))
+ 		{
+ 			/* Parent directory, so backup one */
+ 
+@@ -161,14 +161,14 @@ cwd(dir)
+ 		didpwd=FALSE;
+ 		return;
+ 	}
+-	*pcwd = NULL;
++	*pcwd = 0;
+ 
+ 	--pcwd;
+ 	if(pcwd>cwdname && *pcwd==SLASH)
+ 	{
+ 		/* Remove trailing / */
+ 
+-		*pcwd = NULL;
++		*pcwd = 0;
+ 	}
+ 	return;
+ }
+@@ -279,7 +279,7 @@ rmslash(string)
+ 	{
+ 		/* Remove trailing / */
+ 
+-		*pstring = NULL;
++		*pstring = 0;
+ 	}
+ 	return;
+ }
+diff --git a/resource.c b/resource.c
+index 46d255c..c9d44e9 100644
+--- a/resource.c
++++ b/resource.c
+@@ -88,6 +88,7 @@ dolimit(v)
+ 	limit = getval(lp, v+1);
+ 	if (setlim(lp, hard, limit) < 0)
+ 		exitsh(ERROR);
++	return(0);
+ }
+ 
+ static int64_t
+@@ -158,7 +159,7 @@ badscal:
+ 	return ((int64_t)(f+0.5));
+ }
+ 
+-static
++static int
+ limtail(cp, str0)
+ 	unsigned char *cp, *str0;
+ {
+@@ -171,7 +172,7 @@ limtail(cp, str0)
+ 	return(0);
+ }
+ 
+-static
++static int
+ plim(register struct limits *lp, char hard)
+ {
+ 	struct rlimit rlim;
+@@ -221,9 +222,10 @@ dounlimit(v)
+ 		if (setlim(lp, hard, (rlim_t)RLIM_INFINITY) < 0)
+ 			exitsh(ERROR);
+ 	}
++	return(0);
+ }
+ 
+-static
++static int
+ setlim(register struct limits *lp, char hard, rlim_t limit)
+ {
+ 	struct rlimit rlim;
+@@ -253,7 +255,7 @@ setlim(register struct limits *lp, char hard, rlim_t limit)
+ 	return (0);
+ }
+ 
+-static
++static int
+ psecs(int64_t l)
+ {
+ 	register int64_t i;
+@@ -272,9 +274,10 @@ minsec:
+ 	i %= 60;
+ 	prc_buff(':');
+ 	p2dig(i);
++	return(0);
+ }
+ 
+-static
++static int
+ p2dig(register int64_t i)
+ {
+ 
+@@ -283,7 +286,7 @@ p2dig(register int64_t i)
+ 	return(0);
+ }
+ 
+-static
++static int
+ prefix(sub, str)
+ 	register unsigned char *sub, *str;
+ {
+diff --git a/service.c b/service.c
+index 2e47971..a1b64ca 100644
+--- a/service.c
++++ b/service.c
+@@ -80,7 +80,7 @@ initio(iop, save)
+ 						*/
+ 
+ 				fd = chkopen(tmpout);
+-				(void)unlink(tmpout);
++				(void)unlink((char *)tmpout);
+ 			}
+ 			else if (iof & IOMOV)
+ 			{
+@@ -157,6 +157,7 @@ getpath(s)
+ 		} else
+ 			return(cpystak(path));
+ 	}
++	return((unsigned char *)0);
+ 	/*NOTREACHED*/
+ }
+ 
+@@ -245,7 +246,7 @@ execa(at, pos)
+ 			(void)execs(path, t);
+ 			path = getpath(*t);
+ 		}
+-		while (path = execs(path,t))
++		while ((path = execs(path,t)))
+ 			;
+ #ifdef sgi
+ 		if (suidscript)
+@@ -267,7 +268,7 @@ register unsigned char	*t[];
+ 	trim(p = curstak());
+ 	sigchk();
+ 	
+-	(void)execve(p, &t[0] ,xecenv);
++	(void)execve((char *)p, (char **)t ,(char **)xecenv);
+ 	switch (errno)
+ 	{
+ 	case ENOEXEC:		/* could be a shell script */
+@@ -354,11 +355,11 @@ unsigned char	*at;
+ 	if (current)
+ 	{
+ 		last = at;
+-		while (c = *current++)
++		while ((c = *current++))
+ 		{
+ 			if(c == '\\')  { /* remove \ and quoted nulls */
+ 				nosubst = 1;
+-				if(c = *current++)
++				if((c = *current++))
+ 					*last++ = c;
+ 			} else
+ 				*last++ = c;
+@@ -381,7 +382,7 @@ unsigned char	*at;
+ 	if (current)
+ 	{
+ 		last = at;
+-		while (c = *current++)
++		while ((c = *current++))
+ 		{
+ 			if(c == '\\')  { /* remove \ and quoted nulls */
+ 				if((c = *current++)=='/')
+@@ -507,7 +508,7 @@ unsigned char	*s;
+ 		register int length;
+ 		sigchk();
+ 		argp = locstak() + BYTESPERWORD;
+-		while (c = *s) { 
++		while ((c = *s)) { 
+ 			wchar_t l;
+ 			length = mbtowc(&l, (char *)s, MULTI_BYTE_MAX);
+ 			if(c == '\\') { /* skip over quoted characters */
+diff --git a/string.c b/string.c
+index c46e063..88bbece 100644
+--- a/string.c
++++ b/string.c
+@@ -22,7 +22,7 @@ unsigned char *
+ movstr(a, b)
+ register unsigned char	*a, *b;
+ {
+-	while (*b++ = *a++);
++	while ((*b++ = *a++));
+ 	return(--b);
+ }
+ 
+@@ -33,7 +33,7 @@ unsigned char	*s;
+ {
+ 	register unsigned char d;
+ 
+-	while (d = *s++)
++	while ((d = *s++))
+ 	{
+ 		if (d == c)
+ 			return(TRUE);
+diff --git a/test.c b/test.c
+index 423fd63..b92a26b 100644
+--- a/test.c
++++ b/test.c
+@@ -56,6 +56,7 @@ int	argn;
+ 
+ static unsigned char *
+ nxtarg(mt)
++int mt;
+ {
+ 	if (ap >= ac)
+ 	{
+diff --git a/word.c b/word.c
+index 47fef09..d2f8140 100644
+--- a/word.c
++++ b/word.c
+@@ -63,7 +63,7 @@ word()
+ 				/* Pick up rest of multibyte character */
+ 					if (c == NL)
+ 						chkpr();
+-					while(c = *pc++)
++					while((c = *pc++))
+ 						*argp++ = c;
+ 				}
+ 				if(argp == oldargp) { /* null argument - '' */
+diff --git a/xec.c b/xec.c
+index 278109a..b9607ae 100644
+--- a/xec.c
++++ b/xec.c
+@@ -37,6 +37,8 @@ static int posix_path();
+ int
+ execute(argt, xflags, errorflg, pf1, pf2)
+ struct trenod	*argt;
++int xflags;
++int errorflg;
+ int	*pf1, *pf2;
+ {
+ 	/*
+@@ -127,7 +129,6 @@ int	*pf1, *pf2;
+ 					if ((cnt = findpath(com[0], 0)) > 0)
+ 					{
+ 						register unsigned char *path;
+-						int len;
+ 
+ 						path = getpath(com[0]);
+ 						while (--cnt && path)
+@@ -373,7 +374,7 @@ int	*pf1, *pf2;
+ 		case TAND:
+ 		case TORF:
+ 		{
+-			register xval;
++			register int xval;
+ 			xval = execute(lstptr(t)->lstlef, XEC_NOSTOP, 0);
+ 			if ((xval == 0) == (type == TAND))
+ 				execute(lstptr(t)->lstrit, xflags|XEC_NOSTOP, errorflg);
+@@ -464,7 +465,7 @@ int	*pf1, *pf2;
+ 					{
+ 						register unsigned char	*s;
+ 
+-						if (gmatch(r, s = macro(rex->argval)) || (trim(s), eq(r, s)))
++						if (gmatch((const char *)r, (const char *)(s = macro(rex->argval))) || (trim(s), eq(r, s)))
+ 						{
+ 							execute(regp->regcom, XEC_NOSTOP, errorflg);
+ 							regp = 0;
