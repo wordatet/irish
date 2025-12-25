@@ -162,18 +162,11 @@ const char	 *s2, *s2id;
 {
 	flushb();
 	(void)set_label(cmd);
-	/* pfmt(stderr, flag, NULL); */
-	/* flag 0 = error, 1 = warning */
-	/* pfmt would print UX:sh: ERROR: ... */
-	/* We simulate it simply: */
-	/* fprintf(stderr, "sh: %s: ", flag ? "warning" : "error"); */
-	/* Actually UnixWare/SVR4 prints the label set by set_label? */
-	/* For now, just a prefix */
-	
-	/* if (!comb_label) prp(); */ /* prp prints prompt? or label? */
-	/* The original log used pfmt to print headers. */
-	
-	/* simplified output */
+	/*
+	 * SVR4 sh uses pfmt() here to print the command label and ERROR/WARNING
+	 * prefixes. For the Linux port, we simulate this with a simple "sh: "
+	 * prefix for compatibility with standard Bourne shell error reporting.
+	 */
 	prs("sh: ");
 	if (s2) {
 		prs_cntl(s1);

@@ -1,8 +1,23 @@
-diff --git a/args.c b/args.c
-index 46ea973..073d3ae 100644
---- a/args.c
-+++ b/args.c
-@@ -261,6 +261,7 @@ freeargs(blk)
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/args.c /home/mario/git/irish/args.c
+--- /home/mario/Downloads/original-bsh/args.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/args.c	2025-12-25 20:41:39.180036452 +0200
+@@ -46,7 +46,6 @@
+ 	'f',
+ 	'a',
+ 	'm',
+-	'p',
+ 	 0
+ };
+ 
+@@ -66,7 +65,6 @@
+ 	nofngflg,
+ 	exportflg,
+ 	monitorflg,
+-	privflg,
+ 	  0
+ };
+ 
+@@ -263,6 +261,7 @@
  static struct dolnod *
  copyargs(from, n)
  	unsigned char	*from[];
@@ -10,7 +25,7 @@ index 46ea973..073d3ae 100644
  {
  	register struct dolnod *np = (struct dolnod *)alloc(sizeof(struct dolnod));
  	register unsigned char **fp = from;
-@@ -319,7 +320,7 @@ clearup()
+@@ -321,7 +320,7 @@
  	globdolv = 0;
  	globdolc = 0;
  	globdolh = 0;
@@ -19,25 +34,319 @@ index 46ea973..073d3ae 100644
  		;
  	/*
  	 * clean up io files
-diff --git a/bltin.c b/bltin.c
-index 1a58541..efe4082 100644
---- a/bltin.c
-+++ b/bltin.c
-@@ -52,13 +52,6 @@ struct trenod	*t;
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/blok.c /home/mario/git/irish/blok.c
+--- /home/mario/Downloads/original-bsh/blok.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/blok.c	2025-12-25 20:41:39.180036452 +0200
+@@ -1,227 +1,95 @@
+-/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
+-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
+-/*	  All Rights Reserved  	*/
+-
+-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF     	*/
+-/*	UNIX System Laboratories, Inc.                     	*/
+-/*	The copyright notice above does not evidence any   	*/
+-/*	actual or intended publication of such source code.	*/
+-
+-#ident	"@(#)sh:blok.c	1.9.6.1"
+-/*
+- *	UNIX shell
+- */
+-#include	<memory.h>
+ #include	"defs.h"
+-
++#include    <stdlib.h>
++#include    <string.h>
+ 
+ /*
+  *	storage allocator
+- *	(circular first fit strategy)
++ *	Replaced with standard malloc/free for Linux port
++ *  Wrapper functions sh_alloc/sh_free are used to maintain 
++ *  compatibility with valid legacy shell calls.
+  */
+ 
+-#define BUSY 01
+-#define busy(x)	(Rcheat((x)->ag.word) & BUSY)
+-
+ unsigned	brkincr = BRKINCR;
+-static struct blk *blokp;			/*current search pointer*/
+-static struct blk *bloktop;		/* top of arena (last blok) */
+-
+-static unsigned char	*brkbegin, *aligned_brkbegin;
+-unsigned char		*setbrk();
+-void	addblok();
+ 
+ #ifdef __STDC__
+ void *
+ #else
+ char *
+ #endif
+-alloc(nbytes)
++sh_alloc(nbytes)
+ 	size_t nbytes;
+ {
+-	register unsigned rbytes = round(nbytes+ALIGN, ALIGN);
+-
+-	for (;;)
+-	{
+-		int	c = 0;
+-		register struct blk *p = blokp;
+-		register struct blk *q;
+-
+-		do
+-		{
+-			if (!busy(p))
+-			{
+-				while (!busy(q = p->ag.word))
+-					p->ag.word = q->ag.word;
+-				if ((char *)q - (char *)p >= rbytes)
+-				{
+-					blokp = (struct blk *)((char *)p + rbytes);
+-					if (q > blokp)
+-						blokp->ag.word = p->ag.word;
+-					p->ag.word = (struct blk *)(Rcheat(blokp) | BUSY);
+-					return((char *)(p + 1));
+-				}
+-			}
+-			q = p;
+-			p = (struct blk *)(Rcheat(p->ag.word) & ~BUSY);
+-		} while (p > q || (c++) == 0);
+-		addblok(rbytes);
++	void *p;
++	if (nbytes == 0) return NULL;
++	
++	p = malloc(nbytes);
++	if (!p) {
++		error(0, nospace, nospaceid);
+ 	}
++	return p;
+ }
+ 
+ void
+-addblok(reqd)
+-	unsigned reqd;
++sh_free(ap)
++	void *ap;
+ {
+-	if (stakbot == 0)
+-	{
+-		brkbegin = setbrk(3 * BRKINCR);
+-		aligned_brkbegin = (unsigned char *) round(brkbegin, ALIGN);
+-		bloktop = (struct blk *) aligned_brkbegin;
+-	}
+-
+-	if (stakbas != staktop)
+-	{
+-		register unsigned char *rndstak;
+-		register struct blk *blokstak;
+-
+-		/*
+-		 * Round up at least one byte so
+-		 * staktop doesn't get clobbered.
+-		 */
+-
+-		rndstak = (unsigned char *)round(staktop+1, ALIGN);
+-		blokstak = (struct blk *)(stakbas) - 1;
+-		blokstak->ag.word = stakbsy;
+-		stakbsy = blokstak;
+-		bloktop->ag.word = (struct blk *)(Rcheat(rndstak) | BUSY);
+-		bloktop = (struct blk *)(rndstak);
+-	}
+-	reqd += brkincr;
+-	reqd &= ~(brkincr - 1);
+-	blokp = bloktop;
+-	bloktop = bloktop->ag.word = (struct blk *)(Rcheat(bloktop) + reqd);
+-	bloktop->ag.word = (struct blk *) ((long) aligned_brkbegin | BUSY);
+-	{
+-		register unsigned char *stakadr = (unsigned char *)(bloktop + 2);
+-
+-		int length = staktop - stakbot;
+-		if(length)
+-			(void)memcpy(stakadr, stakbot, length);
+-		stakbas = stakbot = stakadr;
+-		staktop = stakbot + length;
++	if (ap) {
++#undef free
++		free(ap); 
++#define free sh_free
+ 	}
+ }
+ 
++/* 
++ * addblok legacy stub
++ */
+ void
+-free(ap)
+-	void *ap;
++addblok(reqd)
++	unsigned reqd;
+ {
+-	register struct blk *p;
+-
+-	p = (struct blk *)ap;
+-	if (p && p < bloktop && p > (struct blk *)aligned_brkbegin)
+-	{
+-#ifdef DEBUG
+-		chkbptr(p);
+-#endif
+-		--p;
+-		p->ag.word = (struct blk *)(Rcheat(p->ag.word) & ~BUSY);
+-	}
+-
+-
+ }
+ 
+-/*
+- * realloc() is needed by __gtxt(). Normally not used.
++/* 
++ * realloc wrapper
++ * Used by __gtxt() in legacy code.
+  */
+ void *
+ realloc(oldp, nbytes)
+ void *oldp;
+ size_t nbytes;
+ {
+-	void *newp;
++	if (!oldp) return sh_alloc(nbytes);
++	if (nbytes == 0) {
++		sh_free(oldp);
++		return NULL;
++	}
++	/* Use standard libc realloc. 
++	   We undefine realloc to bypass any potential macros (though none are currently defined). 
++	   Note: This function is exported as 'realloc' to match the symbol expected by some legacy IRIX libs or tests,
++	   even though defs.h maps realloc->sh_realloc for internal shell usage. */
++#undef realloc
++	return realloc(oldp, nbytes);
++#define realloc sh_realloc
++}
+ 
+-	newp = alloc((int)nbytes);
+-	if(newp){
+-		(void)memcpy(newp, oldp, nbytes);
+-		free(oldp);
+-	}
+-	return(newp);
++/* sh_realloc wrapper for internal shell references */
++void *
++sh_realloc(oldp, nbytes)
++void *oldp;
++size_t nbytes;
++{
++#undef realloc
++    return realloc(oldp, nbytes);
++#define realloc sh_realloc
+ }
+-#ifdef DEBUG
+ 
++#ifdef DEBUG
+ chkbptr(ptr)
+ 	struct blk *ptr;
+ {
+-	int	exf = 0;
+-	register struct blk *p = (struct blk *)aligned_brkbegin;
+-	register struct blk *q;
+-	int	us = 0, un = 0;
+-
+-	for (;;)
+-	{
+-		q = (struct blk *)(Rcheat(p->ag.word) & ~BUSY);
+-
+-		if (p+1 == ptr)
+-			exf++;
+-
+-		if (q < (struct blk *)aligned_brkbegin || q > bloktop)
+-			abort(/* 3 */);
+-
+-		if (p == bloktop)
+-			break;
+-
+-		if (busy(p))
+-			us += q - p;
+-		else
+-			un += q - p;
+-
+-		if (p >= q)
+-			abort(/* 4 */);
+-
+-		p = q;
+-	}
+-	if (exf == 0)
+-		abort(/* 1 */);
+ }
+ 
+-
+ chkmem()
+ {
+-	register struct blk *p = (struct blk *)aligned_brkbegin;
+-	register struct blk *q;
+-	int	us = 0, un = 0;
+-
+-	for (;;)
+-	{
+-		q = (struct blk *)(Rcheat(p->ag.word) & ~BUSY);
+-
+-		if (q < (struct blk *)aligned_brkbegin || q > bloktop)
+-			abort(/* 3 */);
+-
+-		if (p == bloktop)
+-			break;
+-
+-		if (busy(p))
+-			us += q - p;
+-		else
+-			un += q - p;
+-
+-		if (p >= q)
+-			abort(/* 4 */);
+-
+-		p = q;
+-	}
+-
+-	prs("un/used/avail ");
+-	prn(un);
+-	blank();
+-	prn(us);
+-	blank();
+-	prn((char *)bloktop - aligned_brkbegin - (un + us));
+-	newline();
+-
+ }
+-
+-#endif /* DEBUG */
++#endif
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/bltin.c /home/mario/git/irish/bltin.c
+--- /home/mario/Downloads/original-bsh/bltin.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/bltin.c	2025-12-25 20:41:39.180036452 +0200
+@@ -22,10 +22,10 @@
+ #include	<sys/types.h>
+ #include	<sys/times.h>
+ #include	<sys/time.h>
+-#include	<pfmt.h>
++/* #include	<pfmt.h> */
+ #include	<string.h>
+ 
+-extern	unsigned long	umask();
++/* extern unsigned long umask(); */
+ extern	pid_t	fork();
+ extern	pid_t	wait();
+ extern	int	chdir();
+@@ -52,13 +52,6 @@
  {
  	short index = initio(t->treio, (type != SYSEXEC));
  	unsigned char *a1 = argv[1];
--	int c, newmode = -1;
--	static const struct {
+-	int c, newmode = -1, mode, indx, pid, status;
+-static	const struct {
 -		const char *id, *msg;
 -	} charmode[] = {
--		{":823", "virtual"},
--		{":824", "real"}
+-		":823", "virtual",
+-		":824", "real"
 -	};
  
  	switch (type)		
  	{
-@@ -203,7 +196,7 @@ struct trenod	*t;
+@@ -203,7 +196,7 @@
  			     *a1 == '/' ||
  			     cf(a1, ".") == 0 ||
  			     cf(a1, "..") == 0 ||
@@ -46,7 +355,7 @@ index 1a58541..efe4082 100644
  				cdpath = (unsigned char *)nullstr;
  
  			do
-@@ -211,7 +204,7 @@ struct trenod	*t;
+@@ -211,7 +204,7 @@
  				dir = cdpath;
  				cdpath = catpath(cdpath,a1);
  			}
@@ -55,11 +364,35 @@ index 1a58541..efe4082 100644
  
  			if (f) {
  				switch(errno) {
-diff --git a/cmd.c b/cmd.c
-index cb9416d..f74c0a9 100644
---- a/cmd.c
-+++ b/cmd.c
-@@ -124,7 +124,7 @@ cmd(sym, flg)
+@@ -345,15 +338,6 @@
+ 		break;
+ 
+ #ifndef RES	
+-#ifdef sgi
+-	case SYSLIMIT:
+-		dolimit(argv);
+-		break;
+-
+-	case SYSUNLIMIT:
+-		dounlimit(argv);
+-		break;
+-#endif
+ 
+ 	case SYSULIMIT:
+ 		sysulimit(argc, argv);
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/cmd.c /home/mario/git/irish/cmd.c
+--- /home/mario/Downloads/original-bsh/cmd.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/cmd.c	2025-12-25 20:41:39.180036452 +0200
+@@ -12,7 +12,7 @@
+  * UNIX shell
+  */
+ 
+-#include	<pfmt.h>
++#line 14
+ #include	"defs.h"
+ #include	"sym.h"
+ #include	"hash.h"
+@@ -124,7 +124,7 @@
  			synbad();
  
  	case ';':	/*FALLTHROUGH*/
@@ -68,7 +401,7 @@ index cb9416d..f74c0a9 100644
  			i = makelist(TLST, i, e);
  		else if (i == 0)
  			synbad();
-@@ -149,6 +149,7 @@ cmd(sym, flg)
+@@ -149,6 +149,7 @@
   */
  static struct trenod *
  list(flg)
@@ -76,7 +409,7 @@ index cb9416d..f74c0a9 100644
  {
  	register struct trenod *r;
  	register int		b;
-@@ -166,6 +167,7 @@ list(flg)
+@@ -166,6 +167,7 @@
   */
  static struct trenod *
  term(flg)
@@ -84,7 +417,7 @@ index cb9416d..f74c0a9 100644
  {
  	register struct trenod *t;
  
-@@ -464,7 +466,7 @@ item(flag)
+@@ -464,7 +466,7 @@
  	}
  	reserv++;
  	word();
@@ -93,7 +426,7 @@ index cb9416d..f74c0a9 100644
  	{
  		r = makefork(0,r);
  		r->treio = io;
-@@ -549,6 +551,7 @@ chkword()
+@@ -549,6 +551,7 @@
  
  static void
  chksym(sym)
@@ -101,7 +434,7 @@ index cb9416d..f74c0a9 100644
  {
  	register int	x = sym & wdval;
  
-@@ -558,6 +561,7 @@ chksym(sym)
+@@ -558,6 +561,7 @@
  
  static void
  prsym(sym)
@@ -109,20 +442,362 @@ index cb9416d..f74c0a9 100644
  {
  	if (sym & SYMFLG)
  	{
-diff --git a/defs.h b/defs.h
-index f2d667f..9e77e28 100644
---- a/defs.h
-+++ b/defs.h
-@@ -365,7 +365,7 @@ extern int execute();
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/compat.c /home/mario/git/irish/compat.c
+--- /home/mario/Downloads/original-bsh/compat.c	1970-01-01 02:00:00.000000000 +0200
++++ /home/mario/git/irish/compat.c	2025-12-25 20:41:39.180036452 +0200
+@@ -0,0 +1,55 @@
++#include "compat.h"
++#include <fnmatch.h>
++#include <signal.h>
++#include <stdio.h>
++#include <string.h>
++
++/* Global environment for renomed environ */
++unsigned char **sh_environ;
++
++/* Signal list shims */
++const char *const _sys_siglist[] = {
++    "EXIT", "HUP", "INT", "QUIT", "ILL", "TRAP", "ABRT", "EMT", "FPE",
++    "KILL", "BUS", "SEGV", "SYS", "PIPE", "ALRM", "TERM", "USR1", "USR2",
++    "CHLD", "PWR", "WINCH", "URG", "IO", "STOP", "TSTP", "CONT", "TTIN",
++    "TTOU", "VTALRM", "PROF", "XCPU", "XFSZ", "WAITING", "LWP", "FREEZE",
++    "THAW", "CANCEL", "LOST", "USR1", "USR2", NULL
++};
++int _sys_nsig = 40;
++
++int gmatch(const char *s, const char *p) {
++    return fnmatch(p, s, FNM_PATHNAME) == 0;
++}
++
++int wisprint(int c) {
++    return iswprint(c);
++}
++
++int mbftowc(unsigned char *s, wchar_t *pwc, int (*f)(), int *p) {
++    /* Minimal stub for multibyte char reading */
++    int c = f(p);
++    if (c == EOF) return 0;
++    *pwc = (wchar_t)c;
++    s[0] = (unsigned char)c;
++    s[1] = '\0';
++    return 1;
++}
++
++int sig2str(int sig, char *str) {
++    if (sig >= 0 && sig < _sys_nsig && _sys_siglist[sig]) {
++        strcpy(str, _sys_siglist[sig]);
++        return 0;
++    }
++    return -1;
++}
++
++int str2sig(char *str, int *sig) {
++    int i;
++    for (i = 0; i < _sys_nsig; i++) {
++        if (_sys_siglist[i] && strcmp(str, _sys_siglist[i]) == 0) {
++            *sig = i;
++            return 0;
++        }
++    }
++    return -1;
++}
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/compat.h /home/mario/git/irish/compat.h
+--- /home/mario/Downloads/original-bsh/compat.h	1970-01-01 02:00:00.000000000 +0200
++++ /home/mario/git/irish/compat.h	2025-12-25 20:41:39.180036452 +0200
+@@ -0,0 +1,81 @@
++#ifndef COMPAT_H
++#define COMPAT_H
++
++#include <sys/types.h>
++#include <sys/param.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++#include <signal.h>
++#include <errno.h>
++#include <setjmp.h>
++#include <time.h>
++#include <sys/wait.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <termios.h>
++#include <fnmatch.h>
++#include <wchar.h>
++#include <ctype.h>
++#include <wctype.h>
++
++/* IRIX/SVR4 types */
++typedef unsigned char uchar_t;
++typedef unsigned int uint_t;
++typedef unsigned short ushort_t;
++typedef unsigned long ulong_t;
++
++/* Shims for pfmt/locale/setlabel */
++#include <stdio.h>
++#include <stdarg.h>
++
++#define MM_ERROR 0
++#define MM_WARNING 1
++#define MM_INFO 2
++#define MM_ACTION 3
++#define MM_NOLABEL 0x10
++#define MM_NOSTD 0x20
++#define MAXLABEL 24
++
++static inline int pfmt(FILE *stream, long flags, const char *format, ...) {
++    va_list args;
++    va_start(args, format);
++    int ret = vfprintf(stream, format, args);
++    va_end(args);
++    return ret;
++}
++
++static inline char *gettxt(const char *id, const char *def) {
++    return (char *)def;
++}
++
++static inline int setlabel(const char *label) {
++    return 0;
++}
++
++#define gettext(x) (x)
++#define _gettext(x) (x)
++
++/* Missing macros */
++#ifndef MAXNAMLEN
++#define MAXNAMLEN 255
++#endif
++
++#define setcat(x) (0)
++#define setlabel(x) (0)
++
++/* Linker shims */
++int gmatch(const char *s, const char *p);
++int sig2str(int sig, char *str);
++int str2sig(char *str, int *sig);
++int wisprint(int c);
++int mbftowc(unsigned char *s, wchar_t *pwc, int (*f)(), int *p);
++
++extern unsigned char **sh_environ;
++extern const char *const _sys_siglist[];
++extern int _sys_nsig;
++
++#endif /* COMPAT_H */
++#ifndef EFF_ONLY_OK
++#define EFF_ONLY_OK 0
++#endif
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/ctype.h /home/mario/git/irish/ctype.h
+--- /home/mario/Downloads/original-bsh/ctype.h	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/ctype.h	2025-12-25 20:41:39.180036452 +0200
+@@ -72,21 +72,21 @@
+ extern const unsigned char	_ctype1[];
+ 
+ /* nb these args are not call by value !!!! */
+-#define	space(c)	(((c)&QUOTE)==0 && _ctype1[c]&(T_SPC))
+-#define eofmeta(c)	(((c)&QUOTE)==0 && _ctype1[c]&(_META|T_EOF))
+-#define qotchar(c)	(((c)&QUOTE)==0 && _ctype1[c]&(T_QOT))
+-#define eolchar(c)	(((c)&QUOTE)==0 && _ctype1[c]&(T_EOR|T_EOF))
+-#define dipchar(c)	(((c)&QUOTE)==0 && _ctype1[c]&(T_DIP))
+-#define subchar(c)	(((c)&QUOTE)==0 && _ctype1[c]&(T_SUB|T_QOT))
+-#define escchar(c)	(((c)&QUOTE)==0 && _ctype1[c]&(T_ESC))
++#define	space(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(T_SPC))
++#define eofmeta(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(_META|T_EOF))
++#define qotchar(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(T_QOT))
++#define eolchar(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(T_EOR|T_EOF))
++#define dipchar(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(T_DIP))
++#define subchar(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(T_SUB|T_QOT))
++#define escchar(c)	(((c)&QUOTE)==0 && _ctype1[(unsigned char)(c)]&(T_ESC))
+ 
+ extern const unsigned char	_ctype2[];
+ 
+-#define	digit(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_DIG))
+-#define dolchar(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_AST|T_BRC|T_DIG|T_IDC|T_SHN))
+-#define defchar(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_DEF))
+-#define setchar(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_SET))
+-#define digchar(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_AST|T_DIG))
+-#define	letter(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_IDC))
+-#define alphanum(c)	(((c)&QUOTE)==0 && _ctype2[c]&(_IDCH))
+-#define astchar(c)	(((c)&QUOTE)==0 && _ctype2[c]&(T_AST))
++#define	digit(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_DIG))
++#define dolchar(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_AST|T_BRC|T_DIG|T_IDC|T_SHN))
++#define defchar(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_DEF))
++#define setchar(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_SET))
++#define digchar(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_AST|T_DIG))
++#define	letter(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_IDC))
++#define alphanum(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(_IDCH))
++#define astchar(c)	(((c)&QUOTE)==0 && _ctype2[(unsigned char)(c)]&(T_AST))
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/defs.h /home/mario/git/irish/defs.h
+--- /home/mario/Downloads/original-bsh/defs.h	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/defs.h	2025-12-25 20:41:39.180036452 +0200
+@@ -10,9 +10,10 @@
+ /*	Portions Copyright(c) 1988, Sun Microsystems, Inc.	*/
+ /*	All Rights Reserved.					*/
+ 
+-#ident	"@(#)sh:defs.h	1.15.22.2"
+-/*
+- *	UNIX shell
++#ifndef DEFS_H
++#define DEFS_H
++
++/*	UNIX shell
+  */
+ 
+ /* execute flags */
+@@ -36,6 +37,8 @@
+ #define 	FAMP		0x0400
+ #define 	COMMSK		0x00F0
+ #define		CNTMSK		0x000F
++#define		ARGMK		((intptr_t)0x01)
++#define		WORD		0
+ 
+ #define 	TCOM		0x0000
+ #define 	TPAR		0x0010
+@@ -96,12 +99,11 @@
+ #define 	SYSKILL		32
+ #define 	SYSSUSP		33
+ #define 	SYSSTOP		34
+-#define		SYSPRIV		35
+-#define		SYSMLD		36
+-#if defined(sgi) && !defined(RES)
+-#define		SYSLIMIT	37
+-#define		SYSUNLIMIT	38
+-#endif
++
++#define SYSPRIV		(SYSNEWGRP|020)
++#define SYSLIMIT	(SYSNEWGRP|021)
++#define SYSUNLIMIT	(SYSNEWGRP|022)
++#define SYSMLD		(SYSNEWGRP|023)
+ 
+ /* used for input and output of shell */
+ #define 	INIO 		19
+@@ -110,6 +112,7 @@
+ #define 	USERIO		10
+ #define 	IOUFD		15
+ #define 	IODOC		16
++#define		IODIGFD		32
+ #define 	IOPUT		32
+ #define 	IOAPP		64
+ #define 	IOMOV		128
+@@ -138,12 +141,21 @@
+ 
+ extern int		optind;
+ extern int		opterr;
+-extern int 		_sp;
+-extern char 		*optarg;
++#include	<signal.h>
++#include	<sys/types.h>
++#include    "compat.h"
+ 
+-/* result type declarations */
++#ifdef EOF
++#undef EOF
++#endif
++#define EOF 0
++#define SH_EOF 0
+ 
+-#define 	alloc 		malloc
++/* id's */
++
++/* Redirect shell allocators to avoid libc conflicts */
++#define alloc sh_alloc
++#define free sh_free
+ 
+ #ifdef __STDC__
+ extern void *alloc();
+@@ -249,6 +261,7 @@
+ 
+ /*From name.c*/
+ extern unsigned char *make();
++#define setenv sh_setenv
+ extern unsigned char **setenv();
+ extern struct namnod *lookup();
+ extern struct namnod *findnam();
+@@ -291,9 +304,9 @@
+ /*From profile.c*/
+ extern void monitor();
+ 
+-/*From prv.c*/
+-extern int clrprivs();
+-extern void rstprivs();
++/*From prv.c: Removed for POSIX port*/
++/* extern int clrprivs(); */
++/* extern void rstprivs(); */
+ 
+ /*From pwd.c*/
+ extern unsigned char *cwdget();
+@@ -340,9 +353,9 @@
+ 
+ /*From word.c*/
+ extern int word();
+-extern unsigned char readc();
+-extern unsigned char nextc();
+-extern unsigned char skipc();
++extern int readc();
++extern int nextc();
++extern int skipc();
+ extern unsigned char *readw();
+ 
+ /*From xec.c*/
+@@ -352,7 +365,7 @@
  
  /*Macros*/
  #define 	attrib(n,f)		(n->namflg |= f)
--#define 	round(a,b)		(((long)(((char *)(a)+b)-1))&~((b)-1))
+-#define 	round(a,b)		(((int)(((char *)(a)+b)-1))&~((b)-1))
 +#define 	round(a,b)		((((long)(a)+(b))-1)&~((b)-1))
  #define 	closepipe(x)	(close(x[INPIPE]), close(x[OTPIPE]))
  #define 	eq(a,b)			(cf(a,b)==0)
  #define 	max(a,b)		((a)>(b)?(a):(b))
-@@ -669,6 +669,7 @@ void error(int, const char *, const char *);
+@@ -484,9 +497,9 @@
+ #define		exportflg	0400000
+ #define		monitorflg	01000000
+ #define		jcflg		02000000
+-#define		privflg		04000000
++/* #define		privflg		04000000 */ /* Removed for POSIX port */
+ #define		forcexit	010000000
+-#define		jcoff		020000000
++/* #define		jcoff		020000000 */ /* Removed for POSIX port */
+ 
+ extern long				flags;
+ extern int				rwait;	/* flags read waiting */
+@@ -511,6 +524,8 @@
+ extern BOOL				trapnote;
+ 
+ /* name tree and words */
++extern	int		_sp;
++#define environ sh_environ
+ extern unsigned char				**environ;
+ extern unsigned char				numbuf[];
+ extern const char				export[], exportid[];
+@@ -525,20 +540,15 @@
+ extern int				funcnt;
+ 
+ /* messages */
++/* messages */
+ extern const char				nopset[], nopsetid[];
+-extern const char				setprv[], setprvid[];
+-extern const char				clrprv[], clrprvid[];
+-extern const char				setnam[], setnamid[];
+-extern const char				prvnam[], prvnamid[];
+-extern const char				getpriv[], getprivid[];
+-extern const char				rstpriv[], rstprivid[];
+-extern const char				prvunsup[], prvunsupid[];
+-extern const char				mldusage[], mldusageid[];
+-extern const char				nosetmode[], nosetmodeid[];
+-extern const char				nogetmode[], nogetmodeid[];
+-extern const char				notsupport[], notsupportid[];
+-extern const char				invalcomb[], invalcombid[];
+-extern const char				mldmodeis[], mldmodeisid[];
++/* 
++ * IRIX Privilege/MLD message externs removed 
++ */
++extern const char				mailmsg[], mailmsgid[];
++#if defined(sgi)
++/* SGI specific messages removed */
++#endif
+ extern const char				mailmsg[], mailmsgid[];
+ extern const char				coredump[], coredumpid[];
+ extern const char				badopt[], badoptid[];
+@@ -659,6 +669,7 @@
  void error_fail(int, const char *, const char *);
  void failure(int, const unsigned char *, const char *, const char *);
  void prusage(int, const char *, const char *);
@@ -130,10 +805,14 @@ index f2d667f..9e77e28 100644
  #else
  void failed();
  void error();
-diff --git a/echo.c b/echo.c
-index f9cc358..ae5b273 100644
---- a/echo.c
-+++ b/echo.c
+@@ -667,3 +678,4 @@
+ void warning();
+ void error_fail();
+ #endif
++#endif /* DEFS_H */
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/echo.c /home/mario/git/irish/echo.c
+--- /home/mario/Downloads/original-bsh/echo.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/echo.c	2025-12-25 20:41:39.180036452 +0200
 @@ -20,7 +20,9 @@
  
  extern int exitval;
@@ -144,7 +823,7 @@ index f9cc358..ae5b273 100644
  unsigned char **argv;
  {
  	register unsigned char	*cp;
-@@ -59,7 +61,7 @@ unsigned char **argv;
+@@ -59,7 +61,7 @@
  
  		if (!strncmp((const char *)argv[1], "-n", 3)) {
  			nonl++;
@@ -153,11 +832,55 @@ index f9cc358..ae5b273 100644
  			argc--;
  		}
  	
-diff --git a/error.c b/error.c
-index 8b1a1cd..b344955 100644
---- a/error.c
-+++ b/error.c
-@@ -88,7 +88,7 @@ struct ionod	*base;
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/error.c /home/mario/git/irish/error.c
+--- /home/mario/Downloads/original-bsh/error.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/error.c	2025-12-25 20:46:20.655255924 +0200
+@@ -12,7 +12,7 @@
+  * UNIX shell
+  */
+ 
+-#include	<pfmt.h>
++#include	<stdio.h>
+ #include	<string.h>
+ #include	"defs.h"
+ 
+@@ -28,7 +28,7 @@
+ const char unsigned *s1;
+ const char	 *s2, *s2id;
+ {
+-	com_failed(cmd, MM_ERROR, s1, s2, s2id);
++	com_failed(cmd, 0, s1, s2, s2id);
+ 	exitsh(ERROR);
+ }
+ 
+@@ -37,7 +37,7 @@
+ int cmd;
+ const char	*s, *sid;
+ {
+-	failed(cmd, (const unsigned char *)gettxt(sid, s), NIL, NIL);
++	failed(cmd, (const unsigned char *)s, NIL, NIL);
+ }
+ 
+ void
+@@ -45,7 +45,7 @@
+ int cmd;
+ const char	*s, *sid;
+ {
+-	failure(cmd, (const unsigned char *)gettxt(sid, s), NIL, NIL);
++	failure(cmd, (const unsigned char *)s, NIL, NIL);
+ }
+ 
+ void
+@@ -53,7 +53,7 @@
+ int cmd;
+ const char	*s, *sid;
+ {
+-	com_failed(cmd, MM_WARNING, (const unsigned char *)gettxt(sid, s), NIL, NIL);
++	com_failed(cmd, 1, (const unsigned char *)s, NIL, NIL);
+ }
+ 
+ void
+@@ -88,7 +88,7 @@
  {
  	while (iotemp > base)
  	{
@@ -166,7 +889,7 @@ index 8b1a1cd..b344955 100644
  		free(iotemp->iolink);
  		iotemp = iotemp->iolst;
  	}
-@@ -99,7 +99,7 @@ rmfunctmp()
+@@ -99,7 +99,7 @@
  {
  	while (fiotemp)
  	{
@@ -175,22 +898,81 @@ index 8b1a1cd..b344955 100644
  		fiotemp = fiotemp->iolst;
  	}
  }
-@@ -160,9 +160,8 @@ long flag;
+@@ -110,7 +110,7 @@
+ const char unsigned *s1;
+ const char	 *s2, *s2id;
+ {
+-	com_failed(cmd, MM_ERROR, s1, s2, s2id);
++	com_failed(cmd, 0, s1, s2, s2id);
+ 	if (flags & errflg)
+ 		exitsh(ERROR);
+ 
+@@ -127,8 +127,9 @@
+ 	flushb();
+ 	(void)set_label(cmd);
+ 
+-	pfmt(stderr, MM_ERROR, badusage);
+-	pfmt(stderr, MM_ACTION, usage, gettxt(sid, s));
++	/* pfmt(stderr, MM_ERROR, badusage); */
++	/* pfmt(stderr, MM_ACTION, usage, gettxt(sid, s)); */
++	fprintf(stderr, "sh: usage: %s\n", s);
+ 
+ 	if (flags & errflg)
+ 		exitsh(ERROR);
+@@ -146,8 +147,9 @@
+ 	flushb();
+ 	(void)set_label(cmd);
+ 
+-	pfmt(stderr, MM_ERROR, badusage);
+-	pfmt(stderr, MM_ACTION, usage, gettxt(sid, s));
++	/* pfmt(stderr, MM_ERROR, badusage); */
++	/* pfmt(stderr, MM_ACTION, usage, gettxt(sid, s)); */
++	fprintf(stderr, "sh: usage: %s\n", s);
+ 	exitsh(ERROR);
+ }
+ 
+@@ -158,26 +160,20 @@
  const char unsigned *s1;
  const char	 *s2, *s2id;
  {
 -	int comb_label;
  	flushb();
 -	comb_label = set_label(cmd);
+-	pfmt(stderr, flag, NULL);
+-
+-	if (!comb_label)
+-		prp();
+-	
+-	if (s2)
 +	(void)set_label(cmd);
- 	/* pfmt(stderr, flag, NULL); */
- 	/* flag 0 = error, 1 = warning */
- 	/* pfmt would print UX:sh: ERROR: ... */
-diff --git a/expand.c b/expand.c
-index d066905..14d5216 100644
---- a/expand.c
-+++ b/expand.c
-@@ -40,8 +40,10 @@ static int _closedir();
++	/*
++	 * SVR4 sh uses pfmt() here to print the command label and ERROR/WARNING
++	 * prefixes. For the Linux port, we simulate this with a simple "sh: "
++	 * prefix for compatibility with standard Bourne shell error reporting.
++	 */
++	prs("sh: ");
++	if (s2) {
+ 		prs_cntl(s1);
+-	else
++		prs(": ");
++		prs(s2);
++	} else {
+ 		prs(s1);
+-
+-	if (s2)
+-	{
+-		prs(gettxt(colonid, colon));
+-		if (s2id)
+-			prs(gettxt(s2id, s2));
+-		else
+-			prs(s2);
+ 	}
+ 	newline();
+ }
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/expand.c /home/mario/git/irish/expand.c
+--- /home/mario/Downloads/original-bsh/expand.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/expand.c	2025-12-25 20:41:39.180036452 +0200
+@@ -40,8 +40,10 @@
  
  extern int	gmatch();
  
@@ -201,7 +983,7 @@ index d066905..14d5216 100644
  {
  	int	count; 
  	DIR	*dirf;
-@@ -160,7 +162,7 @@ expand(as, rcnt)
+@@ -160,7 +162,7 @@
  			if (e->d_name[0] == '.' && *cs != '.')
  				continue;
  
@@ -210,7 +992,7 @@ index d066905..14d5216 100644
  			{
  				addg(s, e->d_name, rescan, slashsav);
  				count++;
-@@ -248,7 +250,7 @@ unsigned char	*as1, *as2, *as3, *as4;
+@@ -248,7 +250,7 @@
  	s2 = locstak() + BYTESPERWORD;
  	s1 = as1;
  	if(as4) {
@@ -219,7 +1001,7 @@ index d066905..14d5216 100644
  			s2++; 
  	/* Restore first slash before the first metacharacter if as1 is not "/" */
  		if(as4 + 1 == s1)
-@@ -256,7 +258,7 @@ unsigned char	*as1, *as2, *as3, *as4;
+@@ -256,7 +258,7 @@
  	}
  /* add matched entries, plus extra \\ to escape \\'s */
  	s1 = as2;
@@ -228,7 +1010,7 @@ index d066905..14d5216 100644
  		if(*s2 == '\\')
  			*++s2 = '\\';
  		s2++;
-@@ -265,7 +267,7 @@ unsigned char	*as1, *as2, *as3, *as4;
+@@ -265,7 +267,7 @@
  	if (s1)
  	{
  		*s2++ = '/';
@@ -237,11 +1019,150 @@ index d066905..14d5216 100644
  	}
  	makearg(endstak(s2));
  }
-diff --git a/fault.c b/fault.c
-index da0bc69..f1cf238 100644
---- a/fault.c
-+++ b/fault.c
-@@ -185,6 +185,7 @@ int	i;
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/fault.c /home/mario/git/irish/fault.c
+--- /home/mario/Downloads/original-bsh/fault.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/fault.c	2025-12-25 20:41:39.180036452 +0200
+@@ -11,10 +11,10 @@
+ /*
+  * UNIX shell
+  */
+-#include	<pfmt.h>
++/* #include	<pfmt.h> */ 
+ #include	<unistd.h>
+ #include	"defs.h"
+-#include	<sys/procset.h>
++/* #include	<sys/procset.h> */
+ 
+ void done();
+ void stdsigs();
+@@ -95,75 +95,58 @@
+ 	0       /* Real-time signal RTMAX */
+ };
+ 
+-static void (* const(
+-sigval[]))() = 
++static void (*sigval[NSIG])() = { 0 };
++
++static void
++init_sigval()
+ {
+-	0,
+-	done, 	/* 1:  hangup */
+-	fault,	/* 2:  interrupt */
+-	fault,	/* 3:  quit */
+-	done,	/* 4:  illegal instr */
+-	done,	/* 5:  trace trap */
+-	done,	/* 6:  IOT */
+-	done,	/* 7:  EMT */
+-	done,	/* 8:  floating pt. exp */
+-	0,	/* 9:  kill */
+-	done, 	/* 10: bus error */
+-	fault,	/* 11: memory faults */
+-	done, 	/* 12: bad sys call */
+-	done,	/* 13: bad pipe call */
+-	done,	/* 14: alarm */
+-	fault,	/* 15: software termination */
+-	done,	/* 16: unassigned */
+-	done,	/* 17: unassigned */
+-	0,	/* 18: death of child */
+-	done,	/* 19: power fail */
+-	0,	/* 20: window size changes */
+-	done,	/* 21: urgent condition on IO channel */
+-	done,	/* 22: pollable event occurred or i/o possible signal */
+-	0,	/* 23: sendable stop signal not from tty */
+-	0,	/* 24: stop signal from tty */
+-	0,	/* 25: continue a stopped process */
+-	0,	/* 26: to readers pgrp upon background tty read */
+-	0,	/* 27: like TTIN for output if (tp->t_local&LTOSTOP) */
+-	done,	/* 28: virtual time alarm */
+-	done,	/* 29: profiling alarm */
+-	done,	/* 30: Cpu time limit exceeded */
+-	done,	/* 31: Filesize limit exceeded */
+-	0,	/* 32: not used in SVR4; needed for SIGPOLL/SIGIO in IRIX4 */
+-	0,   /* User defined signal 33 */
+-	0,   /* User defined signal 34 */
+-	0,   /* User defined signal 35 */
+-	0,   /* User defined signal 36 */
+-	0,   /* User defined signal 37 */
+-	0,   /* User defined signal 38 */
+-	0,   /* User defined signal 39 */
+-	0,   /* User defined signal 40 */
+-	0,   /* User defined signal 41 */
+-	0,   /* User defined signal 42 */
+-	0,   /* User defined signal 43 */
+-	0,   /* User defined signal 44 */
+-	0,   /* User defined signal 45 */
+-	0,   /* User defined signal 46 */
+-	0,   /* User defined signal 47 */
+-	0,   /* User defined signal 48 */
+-	0,   /* Real-time signal RTMIN */
+-	0,   /* Real-time signal RT2 */
+-	0,   /* Real-time signal RT3 */
+-	0,   /* Real-time signal RT4 */
+-	0,   /* Real-time signal RT5 */
+-	0,   /* Real-time signal RT6 */
+-	0,   /* Real-time signal RT7 */
+-	0,   /* Real-time signal RT8 */
+-	0,   /* Real-time signal RT9 */
+-	0,   /* Real-time signal RT10 */
+-	0,   /* Real-time signal RT11 */
+-	0,   /* Real-time signal RT12 */
+-	0,   /* Real-time signal RT13 */
+-	0,   /* Real-time signal RT14 */
+-	0,   /* Real-time signal RT15 */
+-	0    /* Real-time signal RTMAX */
+-};
++	static int initialized = 0;
++	if (initialized) return;
++
++	sigval[SIGHUP] = done;
++	sigval[SIGINT] = fault;
++	sigval[SIGQUIT] = fault;
++	sigval[SIGILL] = done;
++	sigval[SIGTRAP] = done;
++	sigval[SIGIOT] = done;
++#ifdef SIGEMT
++	sigval[SIGEMT] = done;
++#endif
++	sigval[SIGFPE] = done;
++	sigval[SIGBUS] = done;
++	sigval[SIGSEGV] = fault;
++	sigval[SIGSYS] = done;
++	sigval[SIGPIPE] = done;
++	sigval[SIGALRM] = done;
++	sigval[SIGTERM] = fault;
++#ifdef SIGPWR
++	sigval[SIGPWR] = done;
++#endif
++#ifdef SIGXCPU
++	sigval[SIGXCPU] = done;
++#endif
++#ifdef SIGXFSZ
++	sigval[SIGXFSZ] = done;
++#endif
++#ifdef SIGVTALRM
++	sigval[SIGVTALRM] = done;
++#endif
++#ifdef SIGPROF
++	sigval[SIGPROF] = done;
++#endif
++
++	/* signals we definitely don't want to exit the shell on by default */
++	sigval[SIGCHLD] = 0;
++	sigval[SIGWINCH] = 0;
++	sigval[SIGURG] = 0;
++	sigval[SIGCONT] = 0;
++	sigval[SIGSTOP] = 0;
++	sigval[SIGTSTP] = 0;
++	sigval[SIGTTIN] = 0;
++	sigval[SIGTTOU] = 0;
++
++	initialized = 1;
++}
+ 
+ static int
+ ignoring(i)
+@@ -202,6 +185,7 @@
  
  void
  done(sig)
@@ -249,19 +1170,151 @@ index da0bc69..f1cf238 100644
  {
  	register unsigned char	*t = trapcom[0];
  
-@@ -218,6 +219,7 @@ done(sig)
+@@ -235,24 +219,17 @@
  static void 
  fault(sig, code, scp)
  register int	sig;
+-struct sigcontext *scp;
 +int code;
- void *scp;
++void *scp;
  {
  	register int flag;
-diff --git a/hashserv.c b/hashserv.c
-index 426ebf5..d9e0f79 100644
---- a/hashserv.c
-+++ b/hashserv.c
-@@ -92,7 +92,7 @@ pathlook(com, flg, arg)
+ 	
+-	switch (sig) {
+-		case SIGSEGV:
+-			if (scp->sc_badvaddr == 0)
+-				exitsh(ERROR);
+-			if (setbrk(brkincr) == (unsigned char *)-1)
+-				error(0, nospace, nospaceid);
++	if (sig == SIGALRM) {
++		if (sleeping)
+ 			return;
+-		case SIGALRM:
+-			if (sleeping)
+-				return;
+-			break;
+ 	}
+ 
+-	if (trapcom[sig])
++	if (sig >= 0 && sig < MAXTRAP && trapcom[sig])
+ 		flag = TRAPSET;
+ 	else if (flags & subsh)
+ 		done(sig);
+@@ -262,7 +239,8 @@
+ 	/* ignore SIGTERM, SIGQUIT, and SIGINT when "-i" option is used. */
+ 	if ( (flags&intflg)!=intflg || (sig!=SIGTERM && sig!=SIGQUIT && sig!=SIGINT))
+ 		trapnote |= flag;
+-	trapflg[sig] |= flag;
++	if (sig >= 0 && sig < MAXTRAP)
++		trapflg[sig] |= flag;
+ }
+ 
+ int
+@@ -293,56 +271,27 @@
+ 	}
+ }
+ 
+-#ifdef sgi
+-/*
+- * unwind so that we can do only 1 sigaction call per signal
+- * this is called on each shell startup.
+- */
+ void
+ stdsigs()
+ {
+ 	register int	i;
+-	sigset_t set, oset;
+-	sigaction_t act, oact;
++	struct sigaction act, oact;
+ 
+-	/*
+-	 * block all signals so we can change to catch them - but
+-	 * if they were ignored we can change them back without
+-	 * getting a stray signal
+-	 */
+-	(void)sigfillset(&set);
+-	sigprocmask(SIG_SETMASK, &set, &oset);
++	init_sigval();
+ 
+ 	(void)sigemptyset(&act.sa_mask);
+ 	act.sa_flags = 0;
+ 	for (i = 1; i < MAXTRAP; i++) {
+ 		if (sigval[i] == 0)
+ 			continue;
+-		act.sa_handler = sigval[i];
+-		(void)sigaction(i, &act, &oact);
+-		if (i != SIGSEGV && oact.sa_handler == SIG_IGN) {
+-			act.sa_handler = SIG_IGN;
+-			(void)sigaction(i, &act, NULL);
+-			trapflg[i] |= SIGIGN;
+-		}
+-	}
+-	sigprocmask(SIG_SETMASK, &oset, NULL);
+-}
+-#else
+-void
+-stdsigs()
+-{
+-	register int	i;
+-
+-	for (i = 1; i < MAXTRAP; i++) {
+-		if (sigval[i] == 0)
+-			continue;
++		
+ 		if (i != SIGSEGV && ignoring(i))
+ 			continue;
+-		handle(i, sigval[i]);
++
++		act.sa_handler = sigval[i];
++		(void)sigaction(i, &act, &oact);
+ 	}
+ }
+-#endif
+ 
+ void
+ oldsigs()
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/func.c /home/mario/git/irish/func.c
+--- /home/mario/Downloads/original-bsh/func.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/func.c	2025-12-25 20:41:39.180036452 +0200
+@@ -14,7 +14,7 @@
+ 
+ #include	"defs.h"
+ 
+-extern int	unlink();
++/* extern int	unlink(); */
+ 
+ void	freefunc();
+ void	prcmd();
+@@ -150,7 +150,7 @@
+ 			newline();
+ #endif
+ 
+-			(void)unlink(iop->ioname);
++			(void)unlink((char *)iop->ioname);
+ 
+ 			if (fiotemp == iop)
+ 				fiotemp = iop->iolst;
+@@ -189,7 +189,7 @@
+ }
+ 
+ 
+-static nonl = 0;
++static int nonl = 0;
+ 
+ static	void
+ prbgnlst()
+@@ -213,6 +213,7 @@
+ 
+ void
+ prcmd(t)
++	struct trenod *t;
+ {
+ 	nonl++;
+ 	prf(t);
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/hashserv.c /home/mario/git/irish/hashserv.c
+--- /home/mario/Downloads/original-bsh/hashserv.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/hashserv.c	2025-12-25 20:41:39.180814015 +0200
+@@ -92,7 +92,7 @@
  		h->cost = 0;
  	}
  
@@ -270,7 +1323,7 @@ index 426ebf5..d9e0f79 100644
  	{
  		hentry.data = (BUILTIN | i);
  		count = 1;
-@@ -261,7 +261,7 @@ func_unhash(name)
+@@ -261,7 +261,7 @@
  	h = hfind(name);
  
  	if (h && (h->data & FUNCTION)) {
@@ -279,11 +1332,112 @@ index 426ebf5..d9e0f79 100644
  			h->data = (BUILTIN|i);
  		else
  			h->data = NOTFOUND;
-diff --git a/jobs.c b/jobs.c
-index 03903e5..26dc1d5 100644
---- a/jobs.c
-+++ b/jobs.c
-@@ -233,7 +233,7 @@ int rc;
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/io.c /home/mario/git/irish/io.c
+--- /home/mario/Downloads/original-bsh/io.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/io.c	2025-12-25 20:41:39.180814015 +0200
+@@ -22,7 +22,7 @@
+ 
+ extern int	close();
+ extern int	pipe();
+-extern int	write();
++/* extern int write(); */
+ extern int	link();
+ 
+ /* ========	input output and file copying ======== */
+@@ -292,7 +292,7 @@
+ 		itos(serial++);
+ 		movstr(numbuf, tmpname);
+ 		i->iolink = make(tmpout);
+-		(void)link(i->ioname, i->iolink);
++		(void)link((char *)i->ioname, (char *)i->iolink);
+ 
+ 		i = i->iolst;
+ 	}
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/jobs.c /home/mario/git/irish/jobs.c
+--- /home/mario/Downloads/original-bsh/jobs.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/jobs.c	2025-12-25 20:41:39.180814015 +0200
+@@ -12,7 +12,7 @@
+  * Job control for UNIX Shell
+  */
+ 
+-#include	<sys/termio.h>
++#include	<termios.h>
+ #include	<sys/types.h>
+ #include	<sys/wait.h>
+ #include	<sys/param.h>
+@@ -20,11 +20,10 @@
+ #include	<string.h>
+ #include	<fcntl.h>
+ #include	<errno.h>
+-#include	<pfmt.h>
++#include	<stdio.h>
++#include    <unistd.h>
+ #include	"defs.h"
+ 
+-extern pid_t getpgid();
+-extern int setpgid();
+ extern int str2sig();
+ extern int sig2str();
+ 
+@@ -90,35 +89,10 @@
+ static void	printjob();
+ 
+ /*
+-** Function: tcgetpgrp()
+-** 
+-** Notes: This function retrieves the process group id of the process
+-** currently attached to the terminal.  The ioctl does not use
+-** privilege.
+-*/
+-pid_t
+-tcgetpgrp(fd)
+-{
+-	pid_t pgid;
+-	if (ioctl(fd, TIOCGPGRP, &pgid) == 0)
+-		return pgid;
+-	return (pid_t)-1;
+-}
+-
+-/*
+-** Function: tcsetpgrp()
+-** 
+-** Notes: This function sets the process group id of the process
+-** currently attached to the terminal.  The ioctl does not use
+-** privilege.
+-*/
+-static int
+-tcsetpgrp(fd, pgid)
+-int fd;
+-pid_t pgid;
+-{
+-	return ioctl(fd, TIOCSPGRP, &pgid);
+-}
++ * tcgetpgrp/tcsetpgrp Replaced with standard POSIX calls.
++ * Previous implementation used ioctl(..., TIOCGPGRP/TIOCSPGRP).
++ * Included <unistd.h> to provide prototypes.
++ */
+ 
+ /*
+ ** Function: pgid2job()
+@@ -152,7 +126,7 @@
+ int mustbejob;
+ {
+ 	register struct job *jp,*njp;
+-	register i;
++	register int i;
+ 
+ 	if (*job != '%')
+ 		jp = pgid2job(stoi(job));
+@@ -165,7 +139,7 @@
+ 		for (jp = joblst; jp && jp->j_jid != i; jp = jp->j_nxtp)
+ 			continue;
+ 	} else if (*job == '?') {
+-		register j;
++		register int j;
+ 		register char *p;
+ 		i = strlen(++job);
+ 		jp = 0;
+@@ -259,7 +233,7 @@
  		jp->j_pgid = getpgid(jp->j_pid);
  		jp->j_tgid = jp->j_pgid;
  		if (fg) {
@@ -292,7 +1446,7 @@ index 03903e5..26dc1d5 100644
  				jp->j_tgid = tgid;
  			else {
  				jp->j_flag |= J_SAVETTY;
-@@ -298,10 +298,11 @@ int rc;
+@@ -324,10 +298,11 @@
  
  static void
  collectjobs(wnohang)
@@ -305,7 +1459,7 @@ index 03903e5..26dc1d5 100644
  
  #ifdef _sgi
  	/*
-@@ -321,7 +322,7 @@ collectjobs(wnohang)
+@@ -347,7 +322,7 @@
  #endif
  		if ((pid = waitpid(-1,&stat,wnohang|WUNTRACED|WCONTINUED)) <= 0)
  			break;
@@ -314,7 +1468,23 @@ index 03903e5..26dc1d5 100644
  			(void)statjob(jp,stat,0,0);
  	}
  
-@@ -421,6 +422,7 @@ pid_t new, expected;
+@@ -403,10 +378,12 @@
+ 	int done;
+ 	pid_t pid = jp->j_pid;
+ 
+-	while (waitpid(pid, &stat, WUNTRACED|WNOWAIT) != pid)
+-		continue;
++	while (waitpid(pid, &stat, WUNTRACED) != pid) {
++		if (errno == ECHILD)
++			break;
++		sigchk();
++	}
+ 	done = statjob(jp,stat,1,1);
+-	waitpid(pid, 0, WUNTRACED);
+ 	if (done && exitval && (flags & errflg))
+ 		exitsh(exitval);
+ 	flags |= eflag;
+@@ -445,6 +422,7 @@
  static void
  restartjob(jp,fg)
  register struct job *jp;
@@ -322,7 +1492,17 @@ index 03903e5..26dc1d5 100644
  {
  	if (jp != jobcur) {
  		register struct job *t;
-@@ -464,6 +466,7 @@ register struct job *jp;
+@@ -458,7 +436,9 @@
+ 			jp->j_stty.c_lflag &= ~TOSTOP;
+ 			jp->j_stty.c_lflag |= (mystty.c_lflag&TOSTOP);
+ 			jp->j_stty.c_cc[VSUSP] = mystty.c_cc[VSUSP];
++#ifdef VDSUSP
+ 			jp->j_stty.c_cc[VDSUSP] = mystty.c_cc[VDSUSP];
++#endif
+ 			(void)tcsetattr(0,TCSADRAIN,&jp->j_stty);
+ 		}
+ 		(void)settgid(jp->j_tgid, mypgid);
+@@ -486,6 +466,7 @@
  static void
  printjob(jp,propts)
  register struct job *jp;
@@ -330,16 +1510,68 @@ index 03903e5..26dc1d5 100644
  {
  	int sp = 0;
  
-@@ -905,7 +908,7 @@ char *argv[];
+@@ -525,11 +506,8 @@
+ 			prc_buff(SP);
+ 		sp = 28;
+ 		if (jp->j_flag & J_SIGNALED) {
+-			extern char *_sys_siglist[];
+-			extern int _sys_nsig;
+ 			if (jp->j_xval < (ushort)_sys_nsig) {
+-				const char *sig = __gtxt("uxlibc", jp->j_xval + 4,
+-					_sys_siglist[jp->j_xval]);
++				const char *sig = _sys_siglist[jp->j_xval];
+ 				sp -= strlen(sig);
+ 				prs_buff(sig);
+ 			} else {
+@@ -628,7 +606,7 @@
+ endjobs(check_if)
+ int check_if;
+ {
+-	if ((flags & (jcoff|jcflg)) != jcflg)
++	if ((flags & jcflg) != jcflg)
+ 		return 1;
+ 
+ 	if (check_if && jobcnt && eofflg++ == 0) {
+@@ -680,7 +658,7 @@
+ void
+ allocjob(cmd, cwd, monitor)
+ register char *cmd;
+-register unchar *cwd;
++register unsigned char *cwd;
+ int monitor;
+ {
+ 	register struct job *jp,**jpp;
+@@ -787,7 +765,7 @@
+ int fg;
+ {
+ 
+-	register propts;
++	register int propts;
+ 
+ 	thisjob->j_nxtp = *nextjob;
+ 	*nextjob = thisjob;
+@@ -836,7 +814,7 @@
+ 	extern int opterr;
+ 	register int cmd = SYSJOBS;
+ 	register struct job *jp;
+-	register propts, c;
++	register int propts, c;
+ 	int savoptind = optind;
+ 	int loptind = -1;
+ 	int savopterr = opterr;
+@@ -928,9 +906,9 @@
+ char *argv[];
+ {
  	register int	cmd;
- 	register int fg;
+-	register fg;
++	register int fg;
  
 -	if (fg = eq("fg",argv[0]))
 +	if ((fg = eq("fg",argv[0])))
  		cmd = SYSFG;
  	else
  		cmd = SYSBG;
-@@ -940,7 +943,7 @@ syswait(argc,argv)
+@@ -965,7 +943,7 @@
  int argc;
  char *argv[];
  {
@@ -348,7 +1580,7 @@ index 03903e5..26dc1d5 100644
  	register struct job *jp;
  	int stat;
  
-@@ -1088,8 +1091,8 @@ char *argv[];
+@@ -1113,8 +1091,8 @@
  
  		if (argc == 2) {
  
@@ -359,11 +1591,79 @@ index 03903e5..26dc1d5 100644
  			register char sep = 0;
  			char buf[12];
  
-diff --git a/macro.c b/macro.c
-index b0e9c6d..b76118d 100644
---- a/macro.c
-+++ b/macro.c
-@@ -44,14 +44,14 @@ register unsigned char	endch;
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/libc.c /home/mario/git/irish/libc.c
+--- /home/mario/Downloads/original-bsh/libc.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/libc.c	2025-12-25 20:41:39.180814015 +0200
+@@ -1,62 +1,4 @@
+-/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
+-/*	Copyright (c) 1988 AT&T	*/
+-/*	  All Rights Reserved  	*/
+-
+-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF     	*/
+-/*	UNIX System Laboratories, Inc.                     	*/
+-/*	The copyright notice above does not evidence any   	*/
+-/*	actual or intended publication of such source code.	*/
+-
+-/*
+- * Sh includes a private IOB table since we don't need or want to
+- * pull in the huge multihundred file IOB table from LIBC.
++/* 
++ * libc.c: SVR4 stdio internals.
++ * Removed for Linux port as it conflicts with glibc.
+  */
+-
+-#define MFILES	3
+-#define	SMBUFSZ	8
+-
+-#define	_NFILE	MFILES
+-#include <stdio.h>
+-#include <sys/types.h>
+-
+-#pragma weak __iob = _iob
+-
+-unsigned char _smbuf[_NFILE][SMBUFSZ] = { 0 };
+-unsigned char _bufendadj[_NFILE] = { 0 };
+-unsigned char _bufdirtytab[_NFILE] = { 0 };
+-unsigned char *_bufendtab[_NFILE] = { &_smbuf[0][SMBUFSZ], &_smbuf[1][SMBUFSZ],
+-		&_smbuf[2][SMBUFSZ] };
+-
+-FILE _iob[_NFILE] = {
+-#if _MIPS_SIM == _ABIN32
+-	{ 0, _smbuf[0], _smbuf[0], _IOREAD+_IONBF, 0, 0},
+-	{ 0, _smbuf[1], _smbuf[1],  _IOWRT+_IONBF, 1, 1},
+-	{ 0, _smbuf[2], _smbuf[2],  _IOWRT+_IONBF, 2, 2},
+-#else
+-	{ 0, _smbuf[0], _smbuf[0], _IOREAD+_IONBF, 0},
+-	{ 0, _smbuf[1], _smbuf[1],  _IOWRT+_IONBF, 1},
+-	{ 0, _smbuf[2], _smbuf[2],  _IOWRT+_IONBF, 2},
+-#endif
+-};
+-
+-FILE *_lastbuf = &_iob[_NFILE];
+-
+-/*
+- * sh doesn't use private exit ops
+- */
+-atexit(void *func)
+-{
+-	abort();
+-}
+-
+-void
+-_exithandle(void)
+-{
+-	return;
+-}
+-
+-void
+-__eachexithandle(void)
+-{
+-	return;
+-}
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/macro.c /home/mario/git/irish/macro.c
+--- /home/mario/Downloads/original-bsh/macro.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/macro.c	2025-12-25 20:41:39.181814018 +0200
+@@ -44,14 +44,14 @@
  					pushstak('\\'); 
  					pc = readw(d); 
  					/* push entire multibyte char */
@@ -380,7 +1680,7 @@ index b0e9c6d..b76118d 100644
  					pushstak(c);
  			}
  		} else if(c == '\\') {
-@@ -124,7 +124,7 @@ retry:
+@@ -124,7 +124,7 @@
  			unsigned char		idb[2];
  			unsigned char		*id = idb;
  
@@ -389,7 +1689,16 @@ index b0e9c6d..b76118d 100644
  				c = readc();
  			if (letter(c))
  			{
-@@ -248,7 +248,7 @@ retry:
+@@ -157,7 +157,7 @@
+ 					c = '1';
+ 				}
+ 				c -= '0';
+-				v = ((c == 0) ? cmdadr : ((int)c <= dolc) ? dolv[c] : (unsigned char *)(dolg = 0));
++				v = ((c == 0) ? cmdadr : ((int)c <= dolc) ? dolv[c] : (unsigned char *)(long)(dolg = 0));
+ 			}
+ 			else if (c == '$')
+ 				v = pidadr;
+@@ -248,7 +248,7 @@
  							pushstak('\0');
  						}
  						else
@@ -398,7 +1707,7 @@ index b0e9c6d..b76118d 100644
  								if(quote || (c == '\\' && trimflag)) {
  									register int length;
  									wchar_t l;
-@@ -306,7 +306,7 @@ retry:
+@@ -306,7 +306,7 @@
  					 * do assignment 
  					 */
  						usestak();
@@ -407,7 +1716,7 @@ index b0e9c6d..b76118d 100644
  							if(c == '\\' && trimflag) {
  								c = *argp++;
  								if(!c)
-@@ -433,14 +433,14 @@ int trimflag; /* used to determine if argument will later be trimmed */
+@@ -433,14 +433,14 @@
  	tdystak(savptr);
  	memcpy(stakbot, savptr, strlngth);
  	oldstaktop = staktop = stakbot + strlngth;
@@ -424,7 +1733,7 @@ index b0e9c6d..b76118d 100644
  			/* Pick up all of multibyte character */
  				pushstak(d);
  		}
-@@ -450,7 +450,7 @@ int trimflag; /* used to determine if argument will later be trimmed */
+@@ -450,7 +450,7 @@
  	{
  		extern pid_t parent;
  		int stat;
@@ -433,7 +1742,7 @@ index b0e9c6d..b76118d 100644
  		while (waitpid(parent,&stat,0) != parent)
  			continue;
  		if (WIFEXITED(stat))
-@@ -490,7 +490,7 @@ int	in, ot;
+@@ -490,7 +490,7 @@
  	/*
  	 * DQUOTE used to stop it from quoting
  	 */
@@ -442,7 +1751,7 @@ index b0e9c6d..b76118d 100644
  				       and interpret them */
  	{
  		if(c == '\\') {
-@@ -512,6 +512,7 @@ int	in, ot;
+@@ -512,6 +512,7 @@
  
  static void
  flush(ot)
@@ -450,11 +1759,32 @@ index b0e9c6d..b76118d 100644
  {
  	(void)write(ot, stakbot, staktop - stakbot);
  	if (flags & execpr)
-diff --git a/main.c b/main.c
-index f067584..4c6106d 100644
---- a/main.c
-+++ b/main.c
-@@ -78,6 +78,7 @@ extern pid_t getpid();
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/main.c /home/mario/git/irish/main.c
+--- /home/mario/Downloads/original-bsh/main.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/main.c	2025-12-25 20:41:39.181814018 +0200
+@@ -25,7 +25,7 @@
+ #include	<sys/types.h>
+ #include	<sys/stat.h>
+ #include	<sys/wait.h>
+-#include	<pfmt.h>
++#include	<stdio.h> /* Replaced pfmt.h */
+ #include	"hash.h"
+ #include        "dup.h"
+ 
+@@ -66,22 +66,25 @@
+ static void	chkmail();
+ 
+ extern int close();
+-extern int fcntl();
++/* extern int fcntl(); */
+ extern int setgid();
+ extern int setuid();
+ extern uid_t getgid();
+ extern uid_t getegid();
+ extern uid_t getuid();
+ extern uid_t geteuid();
++int _sp;
+ extern pid_t getpid();
  extern pid_t getsid();
  extern pid_t getpgid();
  
@@ -462,7 +1792,22 @@ index f067584..4c6106d 100644
  main(c, v, e)
  int	c;
  char	*v[];
-@@ -151,7 +152,7 @@ char	*e[];
+ char	*e[];
+ {
++	sh_environ = (unsigned char **)e;
+ 	register int	rflag = ttyflg;
+ 	int		rsflag = 1;	/* local restricted flag */
+ 	register unsigned char *flagc = flagadr;
+@@ -98,7 +101,7 @@
+ 	 * initialize storage allocation
+ 	 */
+ 
+-	stakbot = 0;
++	/* stakbot = 0; - Removed for POSIX port with fixed buffer stak.c */
+ 	addblok((unsigned)0);
+ 
+ 	(void)setlocale(LC_MESSAGES, "");
+@@ -149,7 +152,7 @@
  	 *  the simple file part of the value.
  	 *  is rsh
  	 */
@@ -471,7 +1816,34 @@ index f067584..4c6106d 100644
  	{
  		if (eq("rsh", simple(n->namval)))
  			rsflag = 0;
-@@ -580,6 +581,7 @@ setwidth()
+@@ -193,7 +196,7 @@
+ 	 *      arbitrary and doesn't agree with any recognized
+ 	 *      conventions in IRIX.
+ 	 */
+-	if ((flags & privflg) == 0) {
++	if (1) { /* privflg removed */
+ 		register uid_t euid;
+ 		register gid_t egid;
+ 		register uid_t ruid;
+@@ -267,7 +270,7 @@
+ 	
+ 	if ((beenhere++) == FALSE)	/* ? profile */
+ 	{
+-		if (*(simple(cmdadr)) == '-' && (flags & privflg) == 0)
++		if (*(simple(cmdadr)) == '-') /* privflg removed */
+ 		{			/* system profile */
+ 
+ #ifndef RES
+@@ -394,6 +397,8 @@
+ 		}
+ 
+ 		trapnote = 0;
++		if (flags & prompt)
++			flushb();
+ 		peekc = readc();
+ 		if (eof) {
+ 			if (endjobs(JOB_STOPPED))
+@@ -576,6 +581,7 @@
  
  void
  setmode(prof)
@@ -479,11 +1851,233 @@ index f067584..4c6106d 100644
  {
  	/*
  	 * decide whether interactive
-diff --git a/name.c b/name.c
-index 11b5467..3723683 100644
---- a/name.c
-+++ b/name.c
-@@ -39,7 +39,7 @@ static void	exname();
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/Makefile /home/mario/git/irish/Makefile
+--- /home/mario/Downloads/original-bsh/Makefile	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/Makefile	2025-12-25 20:41:39.180036452 +0200
+@@ -1,48 +1,23 @@
+-#!smake
+-#ident	"$Revision: 1.54 $"
++# Makefile for porting IRIX 6.5.17 sh to Linux
+ 
+-OBJECT_STYLE=N32_M3
+-VLLDLIBS=-L$(ROOT)/usr/lib32/mips3/nonshared -L$(ROOT)/usr/lib32/nonshared -lgen -lw -lc_nomp
+-VLCOPTS=-woff 1116
+-WANTPARALLEL=yes-please
+-
+-include	$(ROOT)/usr/include/make/commondefs
+-
+-# Compile Time Options
+-#
+-#	-DNICE		if defined then a backround process will be
+-#			niced down to NICE.  
+-#	-DACCT		if defined, then shell accounting will be done.
+-#			Note that the rule line for service.o needs to
+-#			be modified if this is included.
+-#
+-
+-TARGETS=bsh 
+-
+-CFILES =  args.c blok.c cmd.c ctype.c \
+-	defs.c echo.c error.c expand.c \
+-	fault.c func.c hash.c hashserv.c io.c macro.c main.c msg.c name.c \
+-	print.c pwd.c service.c setbrk.c stak.c string.c test.c word.c \
+-	xec.c bltin.c jobs.c ulimit.c resource.c libc.c
+-
+-GLDOPTS=
+-LCOPTS=-G 4 -non_shared -use_readonly_const $(VLCOPTS)
+-# Link text and data close together.
+-LLDOPTS=-Wl,-T,10000000,-rdata_shared
+-
+-LLDLIBS=-nostdlib $(VLLDLIBS)
+-LCDEFS= -DACCT
+-
+-default: $(TARGETS)
+-
+-include $(COMMONRULES)
+-
+-install: default
+-	$(INSTALL) -F /sbin bsh
+-	$(INSTALL) -F /sbin -lns bsh jsh
+-	$(INSTALL) -F /usr/bin -lns ../../sbin/bsh jsh
+-	$(INSTALL) -F /usr/bin -lns ../../sbin/bsh bsh
+-
+-bsh: ${OBJECTS}
+-	${CCF} ${OBJECTS} ${LDFLAGS} -o $@.precord
+-	${CORD} $@.precord $@.fb -o $@
++CC = gcc
++CFLAGS = -g -Wall -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I. -DDIRTY -D_sgi -Dsgi
++LDFLAGS = 
++
++OBJS = args.o blok.o cmd.o ctype.o defs.o echo.o error.o expand.o \
++       fault.o func.o hash.o hashserv.o io.o macro.o main.o msg.o name.o \
++       print.o pwd.o service.o stak.o string.o test.o word.o \
++       xec.o bltin.o jobs.o ulimit.o resource.o compat.o
++
++PROG = sh
++
++all: $(PROG)
++
++$(PROG): $(OBJS)
++	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
++
++%.o: %.c
++	$(CC) $(CFLAGS) -c $< -o $@
++
++clean:
++	rm -f $(OBJS) $(PROG)
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/mode.h /home/mario/git/irish/mode.h
+--- /home/mario/Downloads/original-bsh/mode.h	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/mode.h	2025-12-25 20:41:39.181814018 +0200
+@@ -12,7 +12,7 @@
+  *	UNIX shell
+  */
+ 
+-#include <sgidefs.h>
++/* #include <sgidefs.h> */ /* IRIX specific */
+ 
+ #ifdef pdp11
+ typedef char BOOL;
+@@ -21,11 +21,7 @@
+ #endif
+ 
+ 
+-#if (_MIPS_SIM == _MIPS_SIM_ABI32)
+-#define ALIGN		4
+-#else
+ #define ALIGN		8
+-#endif
+ #define BYTESPERWORD	(sizeof (char *))
+ #define	NIL	((char*)0)
+ 
+@@ -35,7 +31,7 @@
+  * into an Rvalue so two cheats
+  * are necessary, one for each context.
+  */
+-#define Rcheat(a)	((int)(a))
++#define Rcheat(a)	((intptr_t)(a))
+ 
+ 
+ /* address puns for storage allocation */
+@@ -55,13 +51,13 @@
+ } address;
+ 
+ 
+-/* heap storage */
++#include <stdint.h>
+ struct blk
+ {
+ 	union {
+ 	struct blk	*word;
+ #if (_MIPS_SIM == _MIPS_SIM_NABI32)
+-	__uint64_t	pad;
++	uint64_t	pad;
+ #endif
+         } ag; 
+ };
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/msg.c /home/mario/git/irish/msg.c
+--- /home/mario/Downloads/original-bsh/msg.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/msg.c	2025-12-25 20:41:39.181814018 +0200
+@@ -15,41 +15,16 @@
+ 
+ #include	"defs.h"
+ #include	"sym.h"
+-#ifdef sgi
+-#include	<msgs/uxsgicore.h>
+-#endif
++#include	"defs.h"
++#include	"sym.h"
+ 
+ /*
+  * error messages
+  */
+-const char	getpriv[]	= "Cannot retrieve process privileges";
+-const char	getprivid[]	= ":825";
+-const char	rstpriv[]	= "Cannot restore process privileges";
+-const char	rstprivid[]	= ":826";
+-const char	setprv[]	= "Cannot turn on privilege";
+-const char	setprvid[]	= ":827";
+-const char	clrprv[]	= "Cannot turn off privilege";
+-const char	clrprvid[]	= ":828";
+-const char	setnam[]	= "Unrecognized privilege set name";
+-const char	setnamid[]	= ":829";
+-const char	prvnam[]	= "Unrecognized privilege name";
+-const char	prvnamid[]	= ":830";
++/* Privilege/MLD messages removed for POSIX port */
+ const char	nopset[]	= "No privilege set specified";
+ const char	nopsetid[]	= ":831";
+-const char	prvunsup[]	= "System does not support privilege!";
+-const char	prvunsupid[]	= ":832";
+-const char	mldusage[]	= "mldmode [-r | -v] [string]";
+-const char	mldusageid[]	= ":893";
+-const char	nosetmode[]	= "Cannot set multilevel mode";
+-const char	nosetmodeid[]	= ":834";
+-const char	nogetmode[]	= "Cannot obtain multilevel mode";
+-const char	nogetmodeid[]	= ":835";
+-const char	notsupport[]	= "System service not installed";
+-const char	notsupportid[]	= ":836";
+-const char	invalcomb[]	= "Invalid combination of options -r & -v.";
+-const char	invalcombid[]	= ":837";
+-const char	mldmodeis[]	= "multilevel mode=";
+-const char	mldmodeisid[]	= ":838";
++
+ const char	badopt[]	= "Bad option(s)";
+ const char	badoptid[]	= ":486";
+ const char	mailmsg[]	= "You have mail\n";
+@@ -177,13 +152,13 @@
+ const char loginshid[]		= ":538";
+ #ifdef sgi
+ const char nosuid[]		= "Setuid program execute permission denied";
+-const char nosuidid[]		= _SGI_MMX_sh_suideperm;
++const char nosuidid[]		= ":000";
+ const char badmagic[]		= "Program not supported by architecture";
+-const char badmagicid[]		= _SGI_MMX_sh_badmagic;
++const char badmagicid[]		= ":000";
+ const char nosuchres[]		= "No such resource";
+ const char nosuchresid[]	= ":510";
+ const char badscale[]		= "Improper or unknown scale factor";
+-const char badscaleid[]		= _SGI_MMX_sh_unknscale;
++const char badscaleid[]		= ":000";
+ #endif
+ 
+ /*
+@@ -292,16 +267,12 @@
+ 	{ "kill",	SYSKILL },
+ #ifdef RES
+ 	{ "login",	SYSLOGIN },
+-	{ "mldmode",	SYSMLD },
+ 	{ "newgrp",	SYSLOGIN },
+ #else
+ #ifdef sgi
+-	{ "limit",	SYSLIMIT },
+ #endif
+-	{ "mldmode",	SYSMLD },
+ 	{ "newgrp",	SYSNEWGRP },
+ #endif
+-	{ "priv",	SYSPRIV },
+ 	{ "pwd",	SYSPWD },
+ 	{ "read",	SYSREAD	},
+ 	{ "readonly",	SYSRDONLY },
+@@ -320,7 +291,6 @@
+ 	{ "ulimit",	SYSULIMIT },
+ 	{ "umask",	SYSUMASK },
+ #ifdef sgi
+-	{ "unlimit",	SYSUNLIMIT },
+ #endif
+ #endif
+ 
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/name.c /home/mario/git/irish/name.c
+--- /home/mario/Downloads/original-bsh/name.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/name.c	2025-12-25 20:41:39.181814018 +0200
+@@ -15,7 +15,7 @@
+  * UNIX shell
+  */
+ 
+-#include	<pfmt.h>
++/* #include	<pfmt.h> */
+ #include	"hash.h"
+ #include	"defs.h"
+ 
+@@ -39,7 +39,7 @@
  static void	pushnam();
  static void	setname();
  static BOOL	chkid();
@@ -492,7 +2086,7 @@ index 11b5467..3723683 100644
  
  struct namnod ps2nod =
  {
-@@ -311,7 +311,7 @@ unsigned char	*v;
+@@ -311,7 +311,7 @@
  static void
  set_builtins_path()
  {
@@ -501,7 +2095,7 @@ index 11b5467..3723683 100644
  
          ucb_builtins = 0;
  #ifdef sgi
-@@ -332,6 +332,7 @@ set_builtins_path()
+@@ -332,6 +332,7 @@
  #endif
  }
   
@@ -509,7 +2103,7 @@ index 11b5467..3723683 100644
  static int
  patheq(component, dir)
  register unsigned char   *component;
-@@ -343,13 +344,14 @@ register char   *dir;
+@@ -343,13 +344,14 @@
          {
                  c = *component++;
                  if (c == COLON)
@@ -525,7 +2119,7 @@ index 11b5467..3723683 100644
  
  int 
  readvar(names)
-@@ -380,7 +382,7 @@ unsigned char	**names;
+@@ -380,7 +382,7 @@
  			break;
  		rest = readw(d);
  		pc = c;
@@ -534,7 +2128,7 @@ index 11b5467..3723683 100644
  		if(!anys(c, ifsnod.namval))
  			break;
  	}
-@@ -413,7 +415,7 @@ unsigned char	**names;
+@@ -413,7 +415,7 @@
  						break;
  					rest = readw(d);
  					pc = c;
@@ -543,7 +2137,7 @@ index 11b5467..3723683 100644
  					if(!anys(c, ifsnod.namval))
  						break;
  				}
-@@ -423,14 +425,14 @@ unsigned char	**names;
+@@ -423,14 +425,14 @@
  			if(d == '\\') {
  				d = readc();
  				rest = readw(d);
@@ -560,7 +2154,7 @@ index 11b5467..3723683 100644
  					pushstak(d);
  				if(!anys(c, ifsnod.namval))
  					oldstak = staktop;
-@@ -443,7 +445,7 @@ unsigned char	**names;
+@@ -443,7 +445,7 @@
  			{
  				rest = readw(d);
  				pc = c;
@@ -569,7 +2163,7 @@ index 11b5467..3723683 100644
  			}
  		}
  	}
-@@ -584,7 +586,7 @@ struct namnod *n;
+@@ -584,7 +586,7 @@
  		prf(n->namenv);
  		prc_buff(NL);
  	}
@@ -578,7 +2172,7 @@ index 11b5467..3723683 100644
  	{
  		prs_buff(n->namid);
  		prc_buff('=');
-@@ -725,7 +727,7 @@ unset_name(name)
+@@ -725,7 +727,7 @@
  {
  	register struct namnod	*n;
  
@@ -587,11 +2181,37 @@ index 11b5467..3723683 100644
  	{
  		if (n->namflg & N_RDONLY)
  			failed(0, name, wtfailed, wtfailedid);
-diff --git a/print.c b/print.c
-index 5cab353..41168ac 100644
---- a/print.c
-+++ b/print.c
-@@ -110,6 +110,7 @@ prn(n)
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/print.c /home/mario/git/irish/print.c
+--- /home/mario/Downloads/original-bsh/print.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/print.c	2025-12-25 20:41:39.181814018 +0200
+@@ -15,7 +15,7 @@
+ 
+ #include	"defs.h"
+ #include	<sys/param.h>
+-#include	<pfmt.h>
++/* #include	<pfmt.h> */
+ 
+ #define		BUFLEN		256
+ 
+@@ -23,7 +23,7 @@
+ 
+ static unsigned char buffer[BUFLEN];
+ static unsigned char *bufp = buffer;
+-static int index = 0;
++static int buff_buff_index = 0;
+ static int buffd = 1;
+ 
+ void	prc_buff();
+@@ -42,7 +42,7 @@
+ 
+ static unsigned char *octal();
+ 
+-extern int write();
++/* extern int write(); */
+ extern int wisprint();
+ 
+ /*
+@@ -110,6 +110,7 @@
  
  void
  itos(n)
@@ -599,11 +2219,78 @@ index 5cab353..41168ac 100644
  {
  	unsigned char *abuf;
  	unsigned a;
-diff --git a/pwd.c b/pwd.c
-index 5e85314..7a55a46 100644
---- a/pwd.c
-+++ b/pwd.c
-@@ -73,9 +73,9 @@ cwd(dir)
+@@ -181,11 +182,11 @@
+ void
+ flushb()
+ {
+-	if (index)
++	if (buff_buff_index)
+ 	{
+-		bufp[index] = '\0';
++		bufp[buff_buff_index] = '\0';
+ 		(void)write(buffd, bufp, length(bufp) - 1);
+-		index = 0;
++		buff_buff_index = 0;
+ 	}
+ }
+ 
+@@ -195,10 +196,10 @@
+ {
+ 	if (c)
+ 	{
+-		if (buffd != -1 && index + 1 >= BUFLEN)
++		if (buffd != -1 && buff_buff_index + 1 >= BUFLEN)
+ 			flushb();
+ 
+-		bufp[index++] = c;
++		bufp[buff_buff_index++] = c;
+ 	}
+ 	else
+ 	{
+@@ -213,15 +214,15 @@
+ {
+ 	register int len = length(s) - 1;
+ 
+-	if (buffd != -1 && index + len >= BUFLEN)
++	if (buffd != -1 && buff_buff_index + len >= BUFLEN)
+ 		flushb();
+ 
+ 	if (buffd != -1 && len >= BUFLEN)
+ 		(void)write(buffd, s, len);
+ 	else
+ 	{
+-		movstr(s, &bufp[index]);
+-		index += len;
++		movstr(s, &bufp[buff_buff_index]);
++		buff_buff_index += len;
+ 	}
+ }
+ 
+@@ -324,16 +325,16 @@
+ 	int ofd;
+ 
+ 	if ((ofd = buffd) == -1) {
+-		if (bufp[index-1])
+-			bufp[index++] = 0;
+-		(void)endstak(bufp+index);
++		if (bufp[buff_buff_index-1])
++			bufp[buff_buff_index++] = 0;
++		(void)endstak(bufp+buff_buff_index);
+ 	} else
+ 		flushb();
+ 	if ((buffd = fd) == -1)
+ 		bufp = locstak();
+ 	else
+ 		bufp = buffer;
+-	index = 0;
++	buff_buff_index = 0;
+ 	return ofd;
+ }
+ 
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/pwd.c /home/mario/git/irish/pwd.c
+--- /home/mario/Downloads/original-bsh/pwd.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/pwd.c	2025-12-25 20:41:39.181814018 +0200
+@@ -73,9 +73,9 @@
  	/* take care of trailing /. */
  	if(*(--pdir)==DOT && pdir > dir && *(--pdir)==SLASH) {
  		if(pdir > dir) {
@@ -615,7 +2302,7 @@ index 5e85314..7a55a46 100644
  		}
  	
  	}
-@@ -86,7 +86,7 @@ cwd(dir)
+@@ -86,7 +86,7 @@
  
  	/* Now that the dir is canonicalized, process it */
  
@@ -624,7 +2311,7 @@ index 5e85314..7a55a46 100644
  	{
  		return;
  	}
-@@ -115,7 +115,7 @@ cwd(dir)
+@@ -115,7 +115,7 @@
  	{
  		if(*dir==DOT && 
  		   *(dir+1)==DOT &&
@@ -633,7 +2320,7 @@ index 5e85314..7a55a46 100644
  		{
  			/* Parent directory, so backup one */
  
-@@ -161,14 +161,14 @@ cwd(dir)
+@@ -161,14 +161,14 @@
  		didpwd=FALSE;
  		return;
  	}
@@ -650,7 +2337,7 @@ index 5e85314..7a55a46 100644
  	}
  	return;
  }
-@@ -279,7 +279,7 @@ rmslash(string)
+@@ -279,7 +279,7 @@
  	{
  		/* Remove trailing / */
  
@@ -659,20 +2346,183 @@ index 5e85314..7a55a46 100644
  	}
  	return;
  }
-diff --git a/resource.c b/resource.c
-index 46d255c..c9d44e9 100644
---- a/resource.c
-+++ b/resource.c
-@@ -88,6 +88,7 @@ dolimit(v)
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/resource.c /home/mario/git/irish/resource.c
+--- /home/mario/Downloads/original-bsh/resource.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/resource.c	2025-12-25 20:41:39.181814018 +0200
+@@ -6,40 +6,40 @@
+ 
+ #ident	"$Revision: 1.10 $"
+ 
+-#ifdef sgi
++
+ 
+ #include "defs.h"
+ #include <sys/resource.h>
+ #include <sys/types.h>
+-#include <sys/syssgi.h>
++
+ #include <unistd.h>
+ 
+ static struct limits *findlim(unsigned char *);
+-static __int64_t getval (register struct limits *lp, unsigned char **v);
+-static limtail(unsigned char *, unsigned char *);
+-static plim(register struct limits *lp, char hard);
+-static setlim(register struct limits *lp, char hard, rlim64_t limit);
+-static psecs(__int64_t);
+-static p2dig(__int64_t);
+-static prefix(unsigned char *, unsigned char *);
++static int64_t getval (register struct limits *lp, unsigned char **v);
++static int limtail(unsigned char *, unsigned char *);
++static int plim(register struct limits *lp, char hard);
++static int setlim(register struct limits *lp, char hard, rlim_t limit);
++static int psecs(int64_t);
++static int p2dig(int64_t);
++static int prefix(unsigned char *, unsigned char *);
+ 
+ 
+ static int command;
+-static struct limits {
+-	int	limconst;
+-	unsigned char	*limname;
+-	int	limdiv;
+-	char	*limscale;
+-} limits[] = {
+-	RLIMIT_CPU,	"cputime",	1,	"seconds",
+-	RLIMIT_FSIZE,	"filesize",	1024,	"kbytes",
+-	RLIMIT_DATA,	"datasize",	1024,	"kbytes",
+-	RLIMIT_STACK,	"stacksize",	1024,	"kbytes",
+-	RLIMIT_CORE,	"coredumpsize",	1024,	"kbytes",
+-	RLIMIT_RSS,	"memoryuse",	1024,	"kbytes",
+-	RLIMIT_NOFILE,	"descriptors",	1,	"",
+-	RLIMIT_VMEM,	"vmemory",	1024,	"kbytes",
+-	-1,		0,
++static struct limits { 
++	int limconst; 
++	unsigned char *limname; 
++	int limdiv; 
++	char *limscale; 
++} limits[] = { 
++	{RLIMIT_CPU, (unsigned char *)"cputime", 1, "seconds"}, 
++	{RLIMIT_FSIZE, (unsigned char *)"filesize", 1024, "kbytes"}, 
++	{RLIMIT_DATA, (unsigned char *)"datasize", 1024, "kbytes"}, 
++	{RLIMIT_STACK, (unsigned char *)"stacksize", 1024, "kbytes"}, 
++	{RLIMIT_CORE, (unsigned char *)"coredumpsize", 1024, "kbytes"}, 
++	{RLIMIT_RSS, (unsigned char *)"memoryuse", 1024, "kbytes"}, 
++	{RLIMIT_NOFILE, (unsigned char *)"descriptors", 1, ""}, 
++	{RLIMIT_AS, (unsigned char *)"vmemory", 1024, "kbytes"}, 
++	{-1, 0, 0, 0} 
+ };
+ 
+ static struct limits *
+@@ -58,15 +58,15 @@
+ 	if (res)
+ 		return (res);
+ 	error(command, nosuchres, nosuchresid);
+-
+-	/*NOTREACHED*/
++	return(0);
+ }
+ 
++int
+ dolimit(v)
+ 	register unsigned char **v;
+ {
+ 	register struct limits *lp;
+-	register rlim64_t limit;
++	register rlim_t limit;
+ 	char hard = 0;
+ 
+ 	command = SYSLIMIT;
+@@ -78,19 +78,20 @@
+ 	if (*v == 0) {
+ 		for (lp = limits; lp->limconst >= 0; lp++)
+ 			plim(lp, hard);
+-		return;
++		return(0);
+ 	}
+ 	lp = findlim(v[0]);
+ 	if (v[1] == 0) {
+ 		plim(lp,  hard);
+-		return;
++		return(0);
+ 	}
  	limit = getval(lp, v+1);
  	if (setlim(lp, hard, limit) < 0)
  		exitsh(ERROR);
 +	return(0);
  }
  
- static int64_t
-@@ -158,7 +159,7 @@ badscal:
- 	return ((int64_t)(f+0.5));
+-static long long
++static int64_t
+ getval(lp, v)
+ 	register struct limits *lp;
+ 	unsigned char **v;
+@@ -103,7 +104,7 @@
+ 		cp++;
+ 	if (*cp == 0) {
+ 		if (*v == 0)
+-			return ((long long)(f+0.5) * lp->limdiv);
++			return ((int64_t)(f+0.5) * lp->limdiv);
+ 		cp = *v;
+ 	}
+ 	switch (*cp) {
+@@ -111,18 +112,18 @@
+ 	case ':':
+ 		if (lp->limconst != RLIMIT_CPU)
+ 			goto badscal;
+-		return ((long long)(f * 60.0 + atof((const char *)cp+1)));
++		return ((int64_t)(f * 60.0 + atof((const char *)cp+1)));
+ 
+ 	case 'h':
+ 		if (lp->limconst != RLIMIT_CPU)
+ 			goto badscal;
+-		limtail(cp, "hours");
++		limtail(cp, (unsigned char *)"hours");
+ 		f *= 3600.;
+ 		break;
+ 
+ 	case 'm':
+ 		if (lp->limconst == RLIMIT_CPU) {
+-			limtail(cp, "minutes");
++			limtail(cp, (unsigned char *)"minutes");
+ 			f *= 60.;
+ 			break;
+ 		}
+@@ -130,35 +131,35 @@
+ 		if (lp->limconst == RLIMIT_CPU)
+ 			goto badscal;
+ 		*cp = 'm';
+-		limtail(cp, "megabytes");
++		limtail(cp, (unsigned char *)"megabytes");
+ 		f *= 1024.*1024.;
+ 		break;
+ 
+ 	case 's':
+ 		if (lp->limconst != RLIMIT_CPU)
+ 			goto badscal;
+-		limtail(cp, "seconds");
++		limtail(cp, (unsigned char *)"seconds");
+ 		break;
+ 
+ 	case 'k':
+ 		if (lp->limconst == RLIMIT_CPU)
+ 			goto badscal;
+-		limtail(cp, "kbytes");
++		limtail(cp, (unsigned char *)"kbytes");
+ 		f *= 1024;
+ 		break;
+ 
+ 	case 'u':
+ 		limtail(cp, (unsigned char *)gettxt(":557", "unlimited"));
+-		return (RLIM64_INFINITY);
++		return (RLIM_INFINITY);
+ 
+ 	default:
+ badscal:
+ 		error(command, badscale, badscaleid);
+ 	}
+-	return ((long long)(f+0.5));
++	return ((int64_t)(f+0.5));
  }
  
 -static
@@ -680,37 +2530,121 @@ index 46d255c..c9d44e9 100644
  limtail(cp, str0)
  	unsigned char *cp, *str0;
  {
-@@ -171,7 +172,7 @@ limtail(cp, str0)
- 	return(0);
+@@ -168,30 +169,33 @@
+ 		cp++, str++;
+ 	if (*cp)
+ 		error(command, badscale, badscaleid);
++	return(0);
  }
  
 -static
 +static int
  plim(register struct limits *lp, char hard)
  {
- 	struct rlimit rlim;
-@@ -221,9 +222,10 @@ dounlimit(v)
- 		if (setlim(lp, hard, (rlim_t)RLIM_INFINITY) < 0)
+-	struct rlimit64 rlim;
+-	rlim64_t limit;
++	struct rlimit rlim;
++	rlim_t limit;
+ 
+ 	prs_buff(lp->limname);
+ 	prs_buff(" \t");
+-	(void) getrlimit64(lp->limconst, &rlim);
++	(void) getrlimit(lp->limconst, &rlim);
+ 	limit = hard ? rlim.rlim_max : rlim.rlim_cur;
+-	if (limit == RLIM64_INFINITY)
++	if (limit == RLIM_INFINITY)
+ 		prs_buff(gettxt(":557", "unlimited"));
+ 	else if (lp->limconst == RLIMIT_CPU)
+ 		psecs(limit);
+ 	else {
+-		prll_buff(limit/lp->limdiv);
++		prn_buff(limit/lp->limdiv);
+ 		prc_buff(' ');
+ 		prs_buff(lp->limscale);
+ 	}
+ 	prc_buff(NL);
++	return(0);
+ }
+ 
++int
+ dounlimit(v)
+ 	register unsigned char **v;
+ {
+@@ -207,37 +211,38 @@
+ 	}
+ 	if (*v == 0) {
+ 		for (lp = limits; lp->limconst >= 0; lp++)
+-			if (setlim(lp, hard, (rlim64_t)RLIM64_INFINITY) < 0)
++			if (setlim(lp, hard, (rlim_t)RLIM_INFINITY) < 0)
+ 				err++;
+ 		if (err)
+ 			exitsh(ERROR);
+-		return;
++		return(0);
+ 	}
+ 	while (*v) {
+ 		lp = findlim(*v++);
+-		if (setlim(lp, hard, (rlim64_t)RLIM64_INFINITY) < 0)
++		if (setlim(lp, hard, (rlim_t)RLIM_INFINITY) < 0)
  			exitsh(ERROR);
  	}
 +	return(0);
  }
  
 -static
+-setlim(register struct limits *lp, char hard, rlim64_t limit)
 +static int
- setlim(register struct limits *lp, char hard, rlim_t limit)
++setlim(register struct limits *lp, char hard, rlim_t limit)
  {
- 	struct rlimit rlim;
-@@ -253,7 +255,7 @@ setlim(register struct limits *lp, char hard, rlim_t limit)
+-	struct rlimit64 rlim;
++	struct rlimit rlim;
+ 
+-	(void) getrlimit64(lp->limconst, &rlim);
++	(void) getrlimit(lp->limconst, &rlim);
+ 	if (hard)
+ 		rlim.rlim_max = limit;
+-  	else if (limit == RLIM64_INFINITY && geteuid() != 0)
++  	else if (limit == RLIM_INFINITY && geteuid() != 0)
+  		rlim.rlim_cur = rlim.rlim_max;
+  	else
+  		rlim.rlim_cur = limit;
+-	if (setrlimit64(lp->limconst, &rlim) < 0) {
++	if (setrlimit(lp->limconst, &rlim) < 0) {
+ 		unsigned char errstr[50], *cp = errstr;
+ 
+ 		cp = movstr(lp->limname, cp);
+ 		cp = movstr(": Can't ", cp);
+-		if (limit == RLIM64_INFINITY)
++		if (limit == RLIM_INFINITY)
+ 			cp = movstr("remove ", cp);
+ 		else
+ 			cp = movstr("set ", cp);
+@@ -250,36 +255,38 @@
  	return (0);
  }
  
 -static
+-psecs(__int64_t l)
 +static int
- psecs(int64_t l)
++psecs(int64_t l)
  {
- 	register int64_t i;
-@@ -272,9 +274,10 @@ minsec:
+-	register __int64_t i;
++	register int64_t i;
+ 
+ 	i = l / 3600;
+ 	if (i) {
+-		prll_buff(i);
++		prn_buff(i);
+ 		prc_buff(':');
+ 		i = l % 3600;
+-		p2dig((__int64_t)(i / 60));
++		p2dig((int64_t)(i / 60));
+ 		goto minsec;
+ 	}
+ 	i = l;
+-	prll_buff(i / 60);
++	prn_buff(i / 60);
+ minsec:
  	i %= 60;
  	prc_buff(':');
  	p2dig(i);
@@ -718,12 +2652,16 @@ index 46d255c..c9d44e9 100644
  }
  
 -static
+-p2dig(register __int64_t i)
 +static int
- p2dig(register int64_t i)
++p2dig(register int64_t i)
  {
  
-@@ -283,7 +286,7 @@ p2dig(register int64_t i)
- 	return(0);
+-	prll_buff((__int64_t)(i / 10));
+-	prll_buff((__int64_t)(i % 10));
++	prn_buff((int64_t)(i / 10));
++	prn_buff((int64_t)(i % 10));
++	return(0);
  }
  
 -static
@@ -731,11 +2669,25 @@ index 46d255c..c9d44e9 100644
  prefix(sub, str)
  	register unsigned char *sub, *str;
  {
-diff --git a/service.c b/service.c
-index 2e47971..a1b64ca 100644
---- a/service.c
-+++ b/service.c
-@@ -80,7 +80,7 @@ initio(iop, save)
+@@ -295,4 +302,4 @@
+ }
+ 
+ 
+-#endif	/* sgi */
++
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/service.c /home/mario/git/irish/service.c
+--- /home/mario/Downloads/original-bsh/service.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/service.c	2025-12-25 20:41:39.181814018 +0200
+@@ -17,8 +17,6 @@
+ #include	<fcntl.h>
+ #include	<memory.h>
+ 
+-#define ARGMK	01
+-
+ void	execa();
+ void	trim();
+ void	suspacct();
+@@ -82,7 +80,7 @@
  						*/
  
  				fd = chkopen(tmpout);
@@ -744,7 +2696,7 @@ index 2e47971..a1b64ca 100644
  			}
  			else if (iof & IOMOV)
  			{
-@@ -157,6 +157,7 @@ getpath(s)
+@@ -159,6 +157,7 @@
  		} else
  			return(cpystak(path));
  	}
@@ -752,7 +2704,7 @@ index 2e47971..a1b64ca 100644
  	/*NOTREACHED*/
  }
  
-@@ -245,7 +246,7 @@ execa(at, pos)
+@@ -247,7 +246,7 @@
  			(void)execs(path, t);
  			path = getpath(*t);
  		}
@@ -761,7 +2713,7 @@ index 2e47971..a1b64ca 100644
  			;
  #ifdef sgi
  		if (suidscript)
-@@ -267,7 +268,7 @@ register unsigned char	*t[];
+@@ -269,7 +268,7 @@
  	trim(p = curstak());
  	sigchk();
  	
@@ -770,7 +2722,7 @@ index 2e47971..a1b64ca 100644
  	switch (errno)
  	{
  	case ENOEXEC:		/* could be a shell script */
-@@ -354,11 +355,11 @@ unsigned char	*at;
+@@ -356,11 +355,11 @@
  	if (current)
  	{
  		last = at;
@@ -784,7 +2736,7 @@ index 2e47971..a1b64ca 100644
  					*last++ = c;
  			} else
  				*last++ = c;
-@@ -381,7 +382,7 @@ unsigned char	*at;
+@@ -383,7 +382,7 @@
  	if (current)
  	{
  		last = at;
@@ -793,7 +2745,7 @@ index 2e47971..a1b64ca 100644
  		{
  			if(c == '\\')  { /* remove \ and quoted nulls */
  				if((c = *current++)=='/')
-@@ -507,7 +508,7 @@ unsigned char	*s;
+@@ -509,7 +508,7 @@
  		register int length;
  		sigchk();
  		argp = locstak() + BYTESPERWORD;
@@ -802,11 +2754,144 @@ index 2e47971..a1b64ca 100644
  			wchar_t l;
  			length = mbtowc(&l, (char *)s, MULTI_BYTE_MAX);
  			if(c == '\\') { /* skip over quoted characters */
-diff --git a/string.c b/string.c
-index c46e063..88bbece 100644
---- a/string.c
-+++ b/string.c
-@@ -22,7 +22,7 @@ unsigned char *
+@@ -557,7 +556,7 @@
+ 			makearg(argp);
+ 			count++;
+ 		}
+-		gchain = (struct argnod *)((int)gchain | ARGMK);
++		gchain = (struct argnod *)((intptr_t)gchain | ARGMK);
+ 	}
+ /*NOTREACHED*/
+ }
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/stak.c /home/mario/git/irish/stak.c
+--- /home/mario/Downloads/original-bsh/stak.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/stak.c	2025-12-25 20:41:39.181814018 +0200
+@@ -1,22 +1,30 @@
+-/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
+-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
+-/*	  All Rights Reserved  	*/
+-
+-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF     	*/
+-/*	UNIX System Laboratories, Inc.                     	*/
+-/*	The copyright notice above does not evidence any   	*/
+-/*	actual or intended publication of such source code.	*/
+-
+-#ident	"@(#)sh:stak.c	1.8.5.1"
+ /*
+  * UNIX shell
+  */
+ 
+ #include	"defs.h"
+-
++#include    <stdlib.h>
+ 
+ /* ========	storage allocation	======== */
+ 
++#define STAK_SIZE (8 * 1024 * 1024) /* 8MB Fixed Stack */
++
++static unsigned char *stak_buffer = NULL;
++
++/* Initialize the stack buffer if not already done */
++static void
++init_stak(void)
++{
++	if (!stak_buffer) {
++		stak_buffer = (unsigned char *)malloc(STAK_SIZE);
++		if (!stak_buffer) {
++			error(0, nospace, nospaceid);
++		}
++		stakbas = stakbot = staktop = stak_buffer;
++		brkend = stak_buffer + STAK_SIZE;
++	}
++}
++
+ #ifdef __STDC__
+ void *
+ #else
+@@ -28,7 +36,14 @@
+ 	register unsigned char	*oldstak;
+ 	register int	size;
+ 
++	if (!stak_buffer) init_stak();
++
+ 	size = round(asize, ALIGN);
++	
++	if (stakbot + size >= brkend) {
++		error(0, nospace, nospaceid);
++	}
++
+ 	oldstak = stakbot;
+ 	staktop = stakbot += size;
+ 	return(oldstak);
+@@ -41,12 +56,15 @@
+ unsigned char *
+ locstak()
+ {
++	if (!stak_buffer) init_stak();
++	
+ 	if (brkend - stakbot < BRKINCR)
+ 	{
+-		if (setbrk(brkincr) == (unsigned char *)-1)
++		/* In fixed mode, we can't grow. If we are running out, we are out. */
++		/* But usually locstak just checks enough space for next op. */
++		/* We rely on the 8MB being enough. */
++		if (stakbot >= brkend)
+ 			error(0, nospace, nospaceid);
+-		if (brkincr < BRKMAX)
+-			brkincr += 256;
+ 	}
+ 	return(stakbot);
+ }
+@@ -54,6 +72,7 @@
+ unsigned char *
+ savstak()
+ {
++	if (!stak_buffer) init_stak();
+ 	assert(staktop == stakbot);
+ 	return(stakbot);
+ }
+@@ -64,9 +83,16 @@
+ {
+ 	register unsigned char	*oldstak;
+ 
++	if (!stak_buffer) init_stak();
++
+ 	*argp++ = 0;
+ 	oldstak = stakbot;
+ 	stakbot = staktop = (unsigned char *)round(argp, ALIGN);
++	
++	if (stakbot >= brkend) {
++		error(0, nospace, nospaceid);
++	}
++	
+ 	return(oldstak);
+ }
+ 
+@@ -74,6 +100,8 @@
+ tdystak(x)		/* try to bring stack back to x */
+ register unsigned char	*x;
+ {
++	if (!stak_buffer) init_stak();
++	
+ 	while ((unsigned char *)stakbsy > x)
+ 	{
+ 		free(stakbsy);
+@@ -86,8 +114,9 @@
+ void
+ stakchk()
+ {
+-	if ((brkend - stakbas) > BRKINCR + BRKINCR)
+-		(void)setbrk(-BRKINCR);
++	if (!stak_buffer) init_stak();
++	
++	/* No-op in fixed stack mode as we don't shrink/grow brk */
+ }
+ 
+ #ifdef __STDC__
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/string.c /home/mario/git/irish/string.c
+--- /home/mario/Downloads/original-bsh/string.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/string.c	2025-12-25 20:41:39.182814022 +0200
+@@ -22,7 +22,7 @@
  movstr(a, b)
  register unsigned char	*a, *b;
  {
@@ -815,7 +2900,7 @@ index c46e063..88bbece 100644
  	return(--b);
  }
  
-@@ -33,7 +33,7 @@ unsigned char	*s;
+@@ -33,7 +33,7 @@
  {
  	register unsigned char d;
  
@@ -824,11 +2909,25 @@ index c46e063..88bbece 100644
  	{
  		if (d == c)
  			return(TRUE);
-diff --git a/test.c b/test.c
-index 423fd63..b92a26b 100644
---- a/test.c
-+++ b/test.c
-@@ -56,6 +56,7 @@ int	argn;
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/test.c /home/mario/git/irish/test.c
+--- /home/mario/Downloads/original-bsh/test.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/test.c	2025-12-25 20:41:39.182814022 +0200
+@@ -29,7 +29,7 @@
+ static int	e1();
+ static int	e2();
+ static int	e3();
+-static int	exp();
++static int	sh_exp();
+ static int	filtyp();
+ static int	fsizep();
+ static int	ftype();
+@@ -51,11 +51,12 @@
+ 	com[ac] = 0;
+ 	if (ac <= 1)
+ 		return(1);
+-	return(exp() ? 0 : 1);
++	return(sh_exp() ? 0 : 1);
+ }
  
  static unsigned char *
  nxtarg(mt)
@@ -836,11 +2935,126 @@ index 423fd63..b92a26b 100644
  {
  	if (ap >= ac)
  	{
-diff --git a/word.c b/word.c
-index 47fef09..d2f8140 100644
---- a/word.c
-+++ b/word.c
-@@ -63,7 +63,7 @@ word()
+@@ -70,7 +71,7 @@
+ }
+ 
+ static int
+-exp()
++sh_exp()
+ {
+ 	int	p1;
+ 	unsigned char	*p2;
+@@ -80,7 +81,7 @@
+ 	if (p2 != 0)
+ 	{
+ 		if (eq(p2, "-o"))
+-			return(p1 | exp());
++			return(p1 | sh_exp());
+ 
+ 		/* if (!eq(p2, ")"))
+ 			failed("test", synmsg); */
+@@ -124,7 +125,7 @@
+ 	a = nxtarg(0);
+ 	if (eq(a, "("))
+ 	{
+-		p1 = exp();
++		p1 = sh_exp();
+ 		if (!eq(nxtarg(0), ")"))
+ 			error(SYSTST, ") expected", ":478");
+ 		return(p1);
+@@ -207,7 +208,7 @@
+ 		return(int1 <= int2);
+ 
+ 	failed(SYSTST, p2, badop, badopid);
+-/* NOTREACHED */
++	return(0);
+ }
+ 
+ static int
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/ulimit.c /home/mario/git/irish/ulimit.c
+--- /home/mario/Downloads/original-bsh/ulimit.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/ulimit.c	2025-12-25 20:41:39.182814022 +0200
+@@ -15,11 +15,9 @@
+ 
+ #include <sys/resource.h>
+ #include <stdlib.h>
+-#include <pfmt.h>
++/* #include <pfmt.h> */
+ #include "defs.h"
+-#ifdef sgi
+-#include <msgs/uxsgicore.h>
+-#endif
++/* #include <msgs/uxsgicore.h> */ 
+ 
+ extern	int	getrlimit64();
+ extern	int	setrlimit64();
+@@ -36,14 +34,18 @@
+ 	int	divisor;
+ 	ulong	mask;
+ } rlimtab[] = {
+-/* RLIMIT_CPU	*/	"time",		":546",	"seconds",	":547",	1,	0x80000000,
+-/* RLIMIT_FSIZE */	"file",		":548",	"blocks",	":549",	512,	0x80000000,
+-/* RLIMIT_DATA	*/	"data",		":550",	"kbytes",	":551",	1024,	0xffc00000,
+-/* RLIMIT_STACK */	"stack",	":552",	"kbytes",	":551",	1024,	0xffc00000,
+-/* RLIMIT_CORE	*/	"coredump",	":553",	"blocks",	":549",	512,	0x80000000,
+-/* RLIMIT_NOFILE */	"nofiles",	":554",	"descriptors",	":555",	1,	0x80000000,
+-/* RLIMIT_VMEM */	"memory",	":556",	"kbytes",	":551",	1024,	0xffc00000,
+-/* RLIMIT_RSS */	"rss", _SGI_MMX_sh_rss, "kbytes",	":551",	1024,	0xffc00000
++	{ "time",	":546",	"seconds",	":547",	1,	0x80000000 },
++	{ "file",	":548",	"blocks",	":549",	512,	0x80000000 },
++	{ "data",	":550",	"kbytes",	":551",	1024,	0xffc00000 },
++	{ "stack",	":552",	"kbytes",	":551",	1024,	0xffc00000 },
++	{ "coredump",	":553",	"blocks",	":549",	512,	0x80000000 },
++	{ "nofiles",	":554",	"descriptors",	":555",	1,	0x80000000 },
++#ifdef RLIMIT_AS
++	{ "memory",	":556",	"kbytes",	":551",	1024,	0xffc00000 },
++#endif
++#ifdef RLIMIT_RSS
++	{ "rss",	":550", "kbytes",	":551",	1024,	0xffc00000 }
++#endif
+ };
+ 
+ 
+@@ -107,10 +109,18 @@
+ 				res = RLIMIT_CPU;
+ 				break;
+ 			case 'v':	
+-				res = RLIMIT_VMEM;
++#ifdef RLIMIT_AS
++				res = RLIMIT_AS;
++#else
++				res = RLIMIT_DATA;
++#endif
+ 				break;
+ 			case 'r':	
++#ifdef RLIMIT_RSS
+ 				res = RLIMIT_RSS;
++#else
++				res = RLIMIT_DATA;
++#endif
+ 				break;
+ 			case '?':
+ 				prusage(SYSULIMIT, ulimuse, ulimuseid);
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/word.c /home/mario/git/irish/word.c
+--- /home/mario/Downloads/original-bsh/word.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/word.c	2025-12-25 20:41:39.182814022 +0200
+@@ -19,14 +19,13 @@
+ 
+ extern int mbftowc();
+ extern int close();
+-extern int read();
+ 
+ /* ========	character handling for command lines	========*/
+ 
+ int
+ word()
+ {
+-	register unsigned char	c, d;
++	register int	c, d;
+ 	struct argnod	*arg = (struct argnod *)locstak();
+ 	register unsigned char	*argp = arg->argval;
+ 	unsigned char	*oldargp;
+@@ -64,7 +63,7 @@
  				/* Pick up rest of multibyte character */
  					if (c == NL)
  						chkpr();
@@ -849,11 +3063,215 @@ index 47fef09..d2f8140 100644
  						*argp++ = c;
  				}
  				if(argp == oldargp) { /* null argument - '' */
-diff --git a/xec.c b/xec.c
-index 278109a..b9607ae 100644
---- a/xec.c
-+++ b/xec.c
-@@ -37,6 +37,8 @@ static int posix_path();
+@@ -98,18 +97,18 @@
+ 					}
+ 				}
+ 			}
+-		} while ((c = nextc(), !eofmeta(c)));
+-		argp = endstak(argp);
++		} while (c = nextc(), !eofmeta(c));
++		argp = (unsigned char *)endstak(argp);
+ 		if (!letter(arg->argval[0]))
+ 			wdset = 0;
+ 
+-		peekn = c | MARK;
++		peekc = c;
+ 		if (arg->argval[1] == 0 && 
+ 		    (d = arg->argval[0], digit(d)) && 
+ 		    (c == '>' || c == '<'))
+ 		{
+ 			word();
+-			wdnum = d - '0';
++			wdnum = (d - '0') | IODIGFD;
+ 		}
+ 		else		/*check for reserved words*/
+ 		{
+@@ -130,12 +129,12 @@
+ 				if ((d = nextc()) == '-')
+ 					wdnum |= IOSTRIP;
+ 				else
+-					peekn = d | MARK;
++					peekc = d;
+ 			}
+ 		}
+ 		else
+ 		{
+-			peekn = d | MARK;
++			peekc = d;
+ 			wdval = c;
+ 		}
+ 	}
+@@ -153,66 +152,21 @@
+ 	return(wdval);
+ }
+ 
+-unsigned char skipc()
++int readc()
+ {
+-	register unsigned char c;
+-
+-	while (c = nextc(), space(c))
+-		;
+-	return(c);
+-}
+-
+-unsigned char nextc()
+-{
+-	register unsigned char	c, d;
+-
+-retry:
+-	if ((d = readc()) == ESCAPE)
+-	{
+-		if ((c = readc()) == NL)
+-		{
+-			chkpr();
+-			goto retry;
+-		}
+-		peekc = c | MARK;
+-	}
+-	return(d);
+-}
+-
+-unsigned char *readw(d)
+-unsigned char d;
+-{
+-	static unsigned char c[MULTI_BYTE_MAX + 1];
+-	int length;
+-	wchar_t l;
+-	if(!multibyte || d < 0200) {
+-		c[0] = d;
+-		c[1] = '\0';
+-		return(c);
+-	}
+-	peekc = d; /* will not overwrite peekc = '\\' */
+-	length = mbftowc(c, &l, readc, &peekc);
+-	if(length < 0)
+-		length = -length;
+-	c[length] = '\0';
+-	return(c);
+-}
+-
+-unsigned char readc()
+-{
+-	register unsigned char	c;
++	register int	c;
+ 	register int	len;
+ 	register struct fileblk *f;
+ 
+ 	if (peekn)
+ 	{
+-		c = (unsigned char)peekn;
++		c = peekn;
+ 		peekn = 0;
+ 		return(c);
+ 	}
+ 	if (peekc)
+ 	{
+-		c = (unsigned char)peekc;
++		c = peekc;
+ 		peekc = 0;
+ 		return(c);
+ 	}
+@@ -230,7 +184,7 @@
+ 					c = SP;
+ 			}
+ 			else
+-				goto retry;	/* = c = readc(); */
++				return(0);
+ 		}
+ 		if (flags & readpr && standin->fstak == 0)
+ 			prc(c);
+@@ -239,7 +193,7 @@
+ 	}
+ 	else if (f->feof || f->fdes < 0)
+ 	{
+-		c = EOF;
++		c = 0;
+ 		f->feof++;
+ 	}
+ 	else if ((len = readb()) <= 0)
+@@ -249,7 +203,7 @@
+ 			f->fdes = -1;
+ 		}
+ 		f->feof++;
+-		c = EOF;
++		c = 0;
+ 	}
+ 	else
+ 	{
+@@ -259,6 +213,25 @@
+ 	return(c);
+ }
+ 
++int nextc()
++{
++	register int	c;
++	if (peekn)
++	{
++		c = peekn;
++		peekn = 0;
++		return(c);
++	}
++	if (peekc)
++	{
++		c = peekc;
++		peekc = 0;
++		return(c);
++	}
++	c = readc();
++	return(c);
++}
++
+ static int
+ readb()
+ {
+@@ -281,3 +254,42 @@
+ 	} while ((len = read(f->fdes, f->fbuf, f->fsiz)) < 0 && trapnote);
+ 	return(len);
+ }
++
++int
++skipc()
++{
++	register int c;
++
++	while (c = nextc(), space(c))
++		;
++	return(c);
++}
++
++unsigned char *
++readw(d)
++unsigned char d;
++{
++	static unsigned char c[MULTI_BYTE_MAX + 1];
++	int length;
++	wchar_t l;
++	if(!multibyte || d < 0200) {
++		c[0] = d;
++		c[1] = '\0';
++		return(c);
++	}
++	peekc = d;
++	length = mbtowc(&l, (char *)&d, 1); /* Simple fallback or use mbftowc if available */
++	/* 
++	 * Note: Irix sh seems to have mbftowc, but since it's undefined at link time 
++	 * or it's in a library we don't have, I'll use a conservative approach.
++	 * Actually, let's try to use mbtowc which is standard.
++	 */
++	if (length <= 0) {
++		c[0] = d;
++		c[1] = '\0';
++		return(c);
++	}
++	c[0] = d;
++	c[1] = '\0';
++	return(c);
++}
+diff -urN '--exclude=.git*' '--exclude=irix-bsh-port.patch' '--exclude=LICENSE' '--exclude=README*' '--exclude=*.sh' '--exclude=*.1' '--exclude=.*' /home/mario/Downloads/original-bsh/xec.c /home/mario/git/irish/xec.c
+--- /home/mario/Downloads/original-bsh/xec.c	2022-09-29 17:59:04.000000000 +0300
++++ /home/mario/git/irish/xec.c	2025-12-25 20:41:39.182814022 +0200
+@@ -37,6 +37,8 @@
  int
  execute(argt, xflags, errorflg, pf1, pf2)
  struct trenod	*argt;
@@ -862,7 +3280,7 @@ index 278109a..b9607ae 100644
  int	*pf1, *pf2;
  {
  	/*
-@@ -127,7 +129,6 @@ int	*pf1, *pf2;
+@@ -127,7 +129,6 @@
  					if ((cnt = findpath(com[0], 0)) > 0)
  					{
  						register unsigned char *path;
@@ -870,7 +3288,33 @@ index 278109a..b9607ae 100644
  
  						path = getpath(com[0]);
  						while (--cnt && path)
-@@ -373,7 +374,7 @@ int	*pf1, *pf2;
+@@ -221,7 +222,7 @@
+ 				if (!(treeflgs&FPOU)) 
+ 				{
+ 					monitor = (!(xflags & XEC_NOSTOP)
+-					  && (flags&(monitorflg|jcflg|jcoff))
++					  && (flags&(monitorflg|jcflg))
+ 					  == (monitorflg|jcflg));
+ 					if (monitor) {
+ 						int savefd;
+@@ -280,7 +281,7 @@
+ 				mypid = getpid();
+ 			}
+ 		
+-			flags |= (forked|jcoff);
++			flags |= forked;
+ 
+ 			fiotemp  = 0;
+ 
+@@ -345,7 +346,6 @@
+ 			 * It's also not at all apparent that the above fix
+ 			 * is correct.
+ 			 */
+-			flags &= ~jcoff;
+ 			clearjobs();
+ 			execute(parptr(t)->partre, xflags|XEC_NOSTOP, errorflg);
+ 			done(0);
+@@ -374,7 +374,7 @@
  		case TAND:
  		case TORF:
  		{
@@ -879,7 +3323,7 @@ index 278109a..b9607ae 100644
  			xval = execute(lstptr(t)->lstlef, XEC_NOSTOP, 0);
  			if ((xval == 0) == (type == TAND))
  				execute(lstptr(t)->lstrit, xflags|XEC_NOSTOP, errorflg);
-@@ -464,7 +465,7 @@ int	*pf1, *pf2;
+@@ -465,7 +465,7 @@
  					{
  						register unsigned char	*s;
  
@@ -888,3 +3332,12 @@ index 278109a..b9607ae 100644
  						{
  							execute(regp->regcom, XEC_NOSTOP, errorflg);
  							regp = 0;
+@@ -499,7 +499,7 @@
+ 	if (s)
+ 	{
+ 		estabf(s);
+-		fb.feval = (unsigned char **)(f);
++		fb.feval = (unsigned char **)(long)(f);
+ 	}
+ 	else if (f >= 0)
+ 		initf(f);
