@@ -1,0 +1,20 @@
+# Build artifacts
+*.o
+sh
+
+# Logs and traces
+*.log
+*.trace
+stress_pid
+jobs.err
+
+# Temporary scripts (if generated)
+check.sh
+pipe_test.sh
+test.sh
+test_sub.sh
+test_sub_2.sh
+
+# System junk
+core
+.DS_Store
