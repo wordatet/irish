@@ -18,6 +18,11 @@
 
 static void com_failed();
 
+static char current_label[MAXLABEL + 1];
+
+#define SVR4_ERROR   "ERROR: "
+#define SVR4_WARNING "WARNING: "
+
 extern int unlink();
 
 /* ========	error handling	======== */
@@ -162,15 +167,17 @@ const char	 *s2, *s2id;
 {
 	flushb();
 	(void)set_label(cmd);
-	/*
-	 * SVR4 sh uses pfmt() here to print the command label and ERROR/WARNING
-	 * prefixes. For the Linux port, we simulate this with a simple "sh: "
-	 * prefix for compatibility with standard Bourne shell error reporting.
+	
+	/* 
+	 * Authentic IRIX/SVR4 format: UX:label: SEVERITY: object: message
 	 */
-	prs("sh: ");
+	prs(current_label);
+	prs(colon);
+	prs(flag ? SVR4_WARNING : SVR4_ERROR);
+	
 	if (s2) {
 		prs_cntl(s1);
-		prs(": ");
+		prs(colon);
 		prs(s2);
 	} else {
 		prs(s1);
@@ -247,5 +254,7 @@ int cmd;
 	}
 	
 	(void)setlabel(cmd_lbl);
+	strncpy(current_label, cmd_lbl, MAXLABEL);
+	current_label[MAXLABEL] = '\0';
 	return 1;
 }
